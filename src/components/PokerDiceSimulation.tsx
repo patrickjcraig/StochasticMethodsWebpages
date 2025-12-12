@@ -134,15 +134,15 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
     : [];
 
   return (
-    <div className="bg-purple-800/30 border border-purple-700 rounded-lg p-6">
+    <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
       <h2 className="text-xl mb-4 flex items-center gap-2">
         <BarChart3 className="w-5 h-5" />
         Monte Carlo Simulation
       </h2>
 
       <div className="space-y-4">
-        <div className="bg-purple-900/50 rounded p-4">
-          <label className="block text-sm text-purple-300 mb-2">
+        <div className="bg-slate-900/50 rounded p-4">
+          <label className="block text-sm text-slate-300 mb-2">
             Number of Simulations
           </label>
           <input
@@ -150,7 +150,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
             min="10000"
             max="1000000"
             step="10000"
-            value={numSimulations}
+            value={Math.min(numSimulations, 1000000)}
             onChange={(e) => setNumSimulations(Number(e.target.value))}
             className="w-full"
             disabled={isRunning}
@@ -158,21 +158,20 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
           <div className="flex items-center gap-3 mt-2">
             <input
               type="number"
-              min="10000"
-              max="10000000"
+              min="1"
               step="10000"
               value={numSimulations}
               onChange={(e) => {
                 const value = Number(e.target.value);
-                if (value >= 10000 && value <= 10000000) {
+                if (value >= 1) {
                   setNumSimulations(value);
                 }
               }}
-              className="bg-purple-900 border border-purple-600 rounded px-3 py-1 text-xl w-32"
+              className="bg-slate-900 border border-slate-600 rounded px-3 py-1 text-xl w-32"
               disabled={isRunning}
             />
-            <div className="text-sm text-purple-400">
-              (10k - 10M)
+            <div className="text-sm text-slate-400">
+              (no limit - slider max: 1M)
             </div>
           </div>
         </div>
@@ -180,7 +179,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
         <button
           onClick={runSimulation}
           disabled={isRunning}
-          className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-900 disabled:cursor-not-allowed px-6 py-3 rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-900 disabled:cursor-not-allowed px-6 py-3 rounded-lg transition-colors"
         >
           {isRunning ? (
             <>
@@ -197,13 +196,13 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
 
         {results && (
           <div className="space-y-4">
-            <div className="bg-purple-900/50 rounded p-4">
-              <div className="text-sm text-purple-300 mb-1">Total Simulations</div>
+            <div className="bg-slate-900/50 rounded p-4">
+              <div className="text-sm text-slate-300 mb-1">Total Simulations</div>
               <div className="text-2xl">{results.total.toLocaleString()}</div>
             </div>
 
-            <div className="bg-purple-900/50 rounded-lg p-4">
-              <h3 className="text-sm text-purple-300 mb-3">Probability Comparison</h3>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <h3 className="text-sm text-slate-300 mb-3">Probability Comparison</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#4c1d95" />
@@ -226,7 +225,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <div className="text-xs text-purple-400 mt-2">
+              <div className="text-xs text-slate-400 mt-2">
                 Bars show simulated probabilities. Hover for expected values.
               </div>
             </div>
@@ -235,24 +234,24 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
               {handOrder.map(hand => {
                 const error = Math.abs((results.probabilities[hand] - expectedValues[hand]) * 100);
                 return (
-                  <div key={hand} className="bg-purple-900/30 rounded p-3 border border-purple-700/50">
+                  <div key={hand} className="bg-slate-900/30 rounded p-3 border border-slate-700/50">
                     <div className="flex justify-between items-center mb-1">
-                      <div className="text-sm text-purple-200">{hand}</div>
-                      <div className="text-xs text-purple-400">
+                      <div className="text-sm text-slate-200">{hand}</div>
+                      <div className="text-xs text-slate-400">
                         {results.counts[hand].toLocaleString()} rolls
                       </div>
                     </div>
                     <div className="flex justify-between items-center text-xs">
                       <div>
-                        <span className="text-purple-300">Simulated: </span>
+                        <span className="text-slate-300">Simulated: </span>
                         <span className="text-white">{(results.probabilities[hand] * 100).toFixed(4)}%</span>
                       </div>
                       <div>
-                        <span className="text-purple-300">Expected: </span>
-                        <span className="text-purple-200">{(expectedValues[hand] * 100).toFixed(4)}%</span>
+                        <span className="text-slate-300">Expected: </span>
+                        <span className="text-slate-200">{(expectedValues[hand] * 100).toFixed(4)}%</span>
                       </div>
                       <div>
-                        <span className="text-purple-300">Error: </span>
+                        <span className="text-slate-300">Error: </span>
                         <span className={error < 0.1 ? 'text-green-400' : error < 0.5 ? 'text-yellow-400' : 'text-red-400'}>
                           {error.toFixed(4)}%
                         </span>
@@ -263,8 +262,8 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
               })}
             </div>
 
-            <div className="bg-purple-900/50 rounded p-4">
-              <div className="text-sm text-purple-300 mb-2">Average Absolute Error</div>
+            <div className="bg-slate-900/50 rounded p-4">
+              <div className="text-sm text-slate-300 mb-2">Average Absolute Error</div>
               <div className="text-2xl">
                 {(handOrder.reduce((sum, hand) => 
                   sum + Math.abs(results.probabilities[hand] - expectedValues[hand]), 0
@@ -275,7 +274,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
         )}
 
         {!results && !isRunning && (
-          <div className="text-center text-purple-400 py-8">
+          <div className="text-center text-slate-400 py-8">
             Click "Run Simulation" to verify the probability calculations
           </div>
         )}

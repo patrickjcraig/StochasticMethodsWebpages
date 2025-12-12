@@ -1,12 +1,20 @@
 import React, { useState, useCallback } from 'react';
-import { RefreshCw, Info, ChevronDown, ChevronUp, Shield, Dices } from 'lucide-react';
+import { RefreshCw, Info, ChevronDown, ChevronUp, Shield, Dices, Zap, Video, Package, DollarSign, Spade } from 'lucide-react';
 import { SequenceVisualizer } from './components/SequenceVisualizer';
 import { ProbabilityCalculator } from './components/ProbabilityCalculator';
 import { SimulationRunner } from './components/SimulationRunner';
 import { PokerDice } from './components/PokerDice';
+import { PowerballCalculator } from './components/PowerballCalculator';
+import { BlackjackCalculator } from './components/BlackjackCalculator';
+import { PacketErrorCalculator } from './components/PacketErrorCalculator';
+import { DiceRollCalculator } from './components/DiceRollCalculator';
+import { PowerNetworkCalculator } from './components/PowerNetworkCalculator';
+import { VideoEncoderCalculator } from './components/VideoEncoderCalculator';
+
+type PageType = 'honeypot' | 'poker' | 'powerball' | 'blackjack' | 'packets' | 'diceroll' | 'power' | 'video';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'honeypot' | 'poker'>('honeypot');
+  const [currentPage, setCurrentPage] = useState<PageType>('honeypot');
   const [totalComputers, setTotalComputers] = useState(10);
   const [honeypots, setHoneypots] = useState(3);
   const [numAttacks, setNumAttacks] = useState(5);
@@ -30,38 +38,118 @@ export default function App() {
     setCurrentSequence(computers.join(''));
   }, [honeypots, victims]);
 
+  const navButtons = [
+    { id: 'honeypot' as const, label: 'Honeypot', icon: Shield },
+    { id: 'poker' as const, label: 'Poker Dice', icon: Dices },
+    { id: 'powerball' as const, label: 'Powerball', icon: DollarSign },
+    { id: 'blackjack' as const, label: 'Blackjack', icon: Spade },
+    { id: 'packets' as const, label: 'Packets', icon: Package },
+    { id: 'diceroll' as const, label: 'Die Rolls', icon: Dices },
+    { id: 'power' as const, label: 'Power Network', icon: Zap },
+    { id: 'video' as const, label: 'Video Encoder', icon: Video },
+  ];
+
+  const renderNavigation = () => (
+    <div className="flex flex-wrap gap-2 mb-6">
+      {navButtons.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          onClick={() => setCurrentPage(id)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
+            currentPage === id
+              ? 'bg-blue-600 text-white'
+              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          }`}
+        >
+          <Icon className="w-4 h-4" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   if (currentPage === 'poker') {
-    return <PokerDice onNavigate={() => setCurrentPage('honeypot')} />;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <PokerDice />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'powerball') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <PowerballCalculator />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'blackjack') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <BlackjackCalculator />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'packets') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <PacketErrorCalculator />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'diceroll') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <DiceRollCalculator />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'power') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <PowerNetworkCalculator />
+        </div>
+      </div>
+    );
+  }
+
+  if (currentPage === 'video') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
+        <div className="max-w-7xl mx-auto">
+          {renderNavigation()}
+          <VideoEncoderCalculator />
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8">
       <div className="max-w-7xl mx-auto">
         {/* Navigation */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setCurrentPage('honeypot')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              currentPage === 'honeypot'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Shield className="w-4 h-4" />
-            Honeypot Attack
-          </button>
-          <button
-            onClick={() => setCurrentPage('poker')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              currentPage === 'poker'
-                ? 'bg-purple-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            <Dices className="w-4 h-4" />
-            Poker Dice
-          </button>
-        </div>
+        {renderNavigation()}
 
         <header className="mb-8">
           <h1 className="text-4xl mb-2">Honeypot Attack Probability</h1>

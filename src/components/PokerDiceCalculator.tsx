@@ -36,7 +36,7 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
     // Three alike (but not full house or better)
     // Choose 1 value for three, positions for three, 2 different values for remaining 2
     const threeAlike = numDice === 5 
-      ? binomial(5, 3) * 6 * binomial(5, 2) * 5 * 4 
+      ? 6 * binomial(5, 3) * 5 * 4 
       : 0;
     
     // Two pair: Choose 2 values for pairs, positions for first pair, positions for second pair, 1 value for last die
@@ -46,7 +46,7 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
     
     // One pair: Choose 1 value for pair, positions for pair, 3 different values for remaining dice
     const onePair = numDice === 5 
-      ? 6 * binomial(5, 2) * binomial(5, 3) * 5 * 4 * 3 
+      ? 6 * binomial(5, 2) * 5 * 4 * 3 
       : 0;
     
     // No two alike: Choose 5 different values, arrange them
@@ -110,25 +110,25 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
   const totalCalcProb = handOrder.reduce((sum, hand) => sum + calculateProbabilities.probabilities[hand], 0);
 
   return (
-    <div className="bg-purple-800/30 border border-purple-700 rounded-lg p-6">
+    <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
       <h2 className="text-xl mb-4 flex items-center gap-2">
         <Calculator className="w-5 h-5" />
         Combinatorial Calculation
       </h2>
 
       <div className="space-y-4">
-        <div className="bg-purple-900/50 rounded p-4">
-          <div className="text-sm text-purple-300 mb-1">Total Possible Outcomes</div>
+        <div className="bg-slate-900/50 rounded p-4">
+          <div className="text-sm text-slate-300 mb-1">Total Possible Outcomes</div>
           <div className="text-2xl">{calculateProbabilities.totalOutcomes.toLocaleString()}</div>
-          <div className="text-xs text-purple-400 mt-1">= 6^{numDice}</div>
+          <div className="text-xs text-slate-400 mt-1">= 6^{numDice}</div>
         </div>
 
         <div className="space-y-2">
           {handOrder.map(hand => (
             <div key={hand} className={`rounded-lg p-3 border ${getColorClass(hand)}`}>
               <div className="flex justify-between items-start mb-2">
-                <div className="text-sm text-purple-200">{hand}</div>
-                <div className="text-xs text-purple-400">
+                <div className="text-sm text-slate-200">{hand}</div>
+                <div className="text-xs text-slate-400">
                   {calculateProbabilities.outcomes[hand].toLocaleString()} ways
                 </div>
               </div>
@@ -137,16 +137,16 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
                   <div className="text-lg">
                     {(calculateProbabilities.probabilities[hand] * 100).toFixed(2)}%
                   </div>
-                  <div className="text-xs text-purple-400">
+                  <div className="text-xs text-slate-400">
                     {calculateProbabilities.probabilities[hand].toExponential(4)}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs text-purple-400">Expected:</div>
-                  <div className="text-sm text-purple-300">
+                  <div className="text-xs text-slate-400">Expected:</div>
+                  <div className="text-sm text-slate-300">
                     {(calculateProbabilities.expectedValues[hand] * 100).toFixed(2)}%
                   </div>
-                  <div className="text-xs text-purple-500">
+                  <div className="text-xs text-slate-500">
                     Error: {Math.abs(
                       (calculateProbabilities.probabilities[hand] - calculateProbabilities.expectedValues[hand]) * 100
                     ).toFixed(4)}%
@@ -157,15 +157,15 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
           ))}
         </div>
 
-        <div className="bg-purple-900/50 rounded p-4 border border-purple-600">
-          <div className="text-sm text-purple-300 mb-1">Sum of All Probabilities</div>
+        <div className="bg-slate-900/50 rounded p-4 border border-slate-600">
+          <div className="text-sm text-slate-300 mb-1">Sum of All Probabilities</div>
           <div className="text-2xl">{(totalCalcProb * 100).toFixed(4)}%</div>
-          <div className="text-xs text-purple-400 mt-1">
+          <div className="text-xs text-slate-400 mt-1">
             Should equal 100% (sanity check)
           </div>
         </div>
 
-        <div className="text-xs text-purple-400 italic bg-purple-900/30 rounded p-3">
+        <div className="text-xs text-slate-400 italic bg-slate-900/30 rounded p-3">
           <strong>Note:</strong> Calculations use combinations and permutations. 
           For example, "One Pair" = C(6,1) × C(5,2) × P(5,3) where we choose 1 value for the pair, 
           2 positions for it, and arrange 3 different values in remaining positions.

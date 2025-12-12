@@ -186,7 +186,7 @@ export function SimulationRunner({
             min="1000"
             max="100000"
             step="1000"
-            value={numSimulations}
+            value={Math.min(numSimulations, 100000)}
             onChange={(e) => setNumSimulations(Number(e.target.value))}
             className="w-full"
             disabled={isRunning}
@@ -194,13 +194,12 @@ export function SimulationRunner({
           <div className="flex items-center gap-3 mt-2">
             <input
               type="number"
-              min="1000"
-              max="1000000"
+              min="1"
               step="1000"
               value={numSimulations}
               onChange={(e) => {
                 const value = Number(e.target.value);
-                if (value >= 1000 && value <= 1000000) {
+                if (value >= 1) {
                   setNumSimulations(value);
                 }
               }}
@@ -208,7 +207,7 @@ export function SimulationRunner({
               disabled={isRunning}
             />
             <div className="text-sm text-slate-500">
-              (1,000 - 1,000,000)
+              (no limit - slider max: 100k)
             </div>
           </div>
         </div>

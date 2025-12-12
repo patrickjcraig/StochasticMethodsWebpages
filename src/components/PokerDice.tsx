@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Dices, RefreshCw, ArrowLeft, Shield } from 'lucide-react';
+import { Dices, RefreshCw } from 'lucide-react';
 import { PokerDiceCalculator } from './PokerDiceCalculator';
 import { PokerDiceSimulation } from './PokerDiceSimulation';
 
-export function PokerDice({ onNavigate }: { onNavigate: () => void }) {
+export function PokerDice() {
   const [numDice, setNumDice] = useState(5);
   const [currentRoll, setCurrentRoll] = useState<number[]>([1, 2, 3, 4, 5]);
 
@@ -32,98 +32,85 @@ export function PokerDice({ onNavigate }: { onNavigate: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-900 text-white p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Navigation */}
-        <div className="mb-6">
-          <button
-            onClick={onNavigate}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-800/50 hover:bg-purple-700/50 rounded-lg transition-colors border border-purple-600"
-          >
-            <Shield className="w-4 h-4" />
-            Back to Honeypot Problem
-          </button>
-        </div>
+    <div>
+      <header className="mb-8">
+        <h1 className="text-4xl mb-2 flex items-center gap-3">
+          <Dices className="w-10 h-10" />
+          Poker Dice Probability
+        </h1>
+        <p className="text-slate-300">
+          Interactive exploration of poker dice hand probabilities
+        </p>
+      </header>
 
-        <header className="mb-8">
-          <h1 className="text-4xl mb-2 flex items-center gap-3">
-            <Dices className="w-10 h-10" />
-            Poker Dice Probability
-          </h1>
-          <p className="text-purple-200">
-            Interactive exploration of poker dice hand probabilities
-          </p>
-        </header>
-
-        <div className="bg-purple-800/30 border border-purple-700 rounded-lg p-6 mb-8">
-          <h2 className="text-xl mb-4">Problem Statement</h2>
-          <p className="text-purple-200 mb-3">
-            Poker dice is played by simultaneously rolling <strong>{numDice}</strong> dice. 
-            Calculate the probability of each possible outcome:
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-purple-200">
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>No two alike: 0.0926</div>
-            </div>
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>One pair: 0.4630</div>
-            </div>
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>Two pair: 0.2315</div>
-            </div>
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>Three alike: 0.1543</div>
-            </div>
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>Full house: 0.0386</div>
-            </div>
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>Four alike: 0.0193</div>
-            </div>
-            <div className="bg-purple-900/50 rounded p-2">
-              <div>Five alike: 7.72×10⁻⁴</div>
-            </div>
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-8">
+        <h2 className="text-xl mb-4">Problem Statement</h2>
+        <p className="text-slate-200 mb-3">
+          Poker dice is played by simultaneously rolling <strong>{numDice}</strong> dice. 
+          Calculate the probability of each possible outcome:
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-200">
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>No two alike: 0.0926</div>
+          </div>
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>One pair: 0.4630</div>
+          </div>
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>Two pair: 0.2315</div>
+          </div>
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>Three alike: 0.1543</div>
+          </div>
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>Full house: 0.0386</div>
+          </div>
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>Four alike: 0.0193</div>
+          </div>
+          <div className="bg-slate-900/50 rounded p-2">
+            <div>Five alike: 7.72×10⁻⁴</div>
           </div>
         </div>
+      </div>
 
-        <div className="mb-8">
-          <div className="bg-purple-800/30 border border-purple-700 rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl">Dice Roller</h2>
-              <button
-                onClick={rollDice}
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+      <div className="mb-8">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl">Dice Roller</h2>
+            <button
+              onClick={rollDice}
+              className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Roll Dice
+            </button>
+          </div>
+          
+          <div className="flex items-center justify-center gap-4 mb-4">
+            {currentRoll.map((die, i) => (
+              <div
+                key={i}
+                className="w-20 h-20 bg-white text-slate-900 rounded-lg flex items-center justify-center text-5xl shadow-lg"
               >
-                <RefreshCw className="w-4 h-4" />
-                Roll Dice
-              </button>
-            </div>
-            
-            <div className="flex items-center justify-center gap-4 mb-4">
-              {currentRoll.map((die, i) => (
-                <div
-                  key={i}
-                  className="w-20 h-20 bg-white text-purple-900 rounded-lg flex items-center justify-center text-5xl shadow-lg"
-                >
-                  {getDiceEmoji(die)}
-                </div>
-              ))}
-            </div>
-            
-            <div className="text-center">
-              <div className="text-sm text-purple-300 mb-1">Result:</div>
-              <div className="text-2xl text-purple-200">{analyzeRoll(currentRoll)}</div>
-              <div className="text-sm text-purple-400 mt-2">
-                Roll: [{currentRoll.join(', ')}]
+                {getDiceEmoji(die)}
               </div>
+            ))}
+          </div>
+          
+          <div className="text-center">
+            <div className="text-sm text-slate-300 mb-1">Result:</div>
+            <div className="text-2xl text-slate-200">{analyzeRoll(currentRoll)}</div>
+            <div className="text-sm text-slate-400 mt-2">
+              Roll: [{currentRoll.join(', ')}]
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <PokerDiceCalculator numDice={numDice} />
-          <PokerDiceSimulation numDice={numDice} />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <PokerDiceCalculator numDice={numDice} />
+        <PokerDiceSimulation numDice={numDice} />
       </div>
     </div>
   );
