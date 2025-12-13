@@ -16,6 +16,7 @@ interface ProbabilitySimulationProps {
     honeypots: number;      // Number of honeypots (traps) in the network
     victims: number;        // Number of real victim computers (totalComputers - honeypots)
     numAttacks: number;     // Number of computers the hacker will attack
+    theoreticalProbability?: number; // The theoretical probability calculated by the parent
 }
 
 export function ProbabilitySimulation({
@@ -23,6 +24,7 @@ export function ProbabilitySimulation({
     honeypots,
     victims,
     numAttacks,
+    theoreticalProbability,
 }: ProbabilitySimulationProps) {
     // State to track the number of simulations to run (user configurable)
     const [numSimulations, setNumSimulations] = useState(1000);
@@ -49,66 +51,8 @@ export function ProbabilitySimulation({
     // State to store data for the convergence graph (showing how probability stabilizes over time)
     const [convergenceData, setConvergenceData] = useState<Array<{ simulations: number; probability: number }>>([]);
     // State to store the theoretically calculated probability for comparison
-    const [theoreticalProb, setTheoreticalProb] = useState<number | null>(null);
-
-    // Calculate theoretical probability using simplified combinatorics
-    // This effect runs whenever the simulation parameters change
-    useEffect(() => {
-        // Helper function to calculate binomial coefficients (n choose k)
-        const binomial = (n: number, k: number): number => {
-            if (k > n || k < 0) return 0;
-            if (k === 0 || k === n) return 1;
-            k = Math.min(k, n - k);
-            let result = 1;
-            for (let i = 0; i < k; i++) {
-                result = result * (n - i) / (i + 1);
-            }
-            return Math.round(result);
-        };
-
-        // Determine which positions are checked. 
-        // In this simulation logic, it seems we check specific fixed positions (0, 2, 4...) 
-        // effectively simulating a patterned attack or sampling.
-        const checkPositions = Array.from({ length: numAttacks }, (_, i) => i * 2);
-        const numCheckPositions = checkPositions.length;
-
-        // If too many positions to check, combinatorial calculation becomes too heavy, so skip it.
-        if (numCheckPositions > 25) {
-            setTheoreticalProb(null);
-            return;
-        }
-
-        const totalPermutations = binomial(totalComputers, honeypots);
-        let caughtPermutations = 0;
-
-        // Iterate through all possible subsets of checked positions (using a bitmask)
-        // to determine if a honeypot would be found.
-        // This effectively uses the Principle of Inclusion-Exclusion logic or exhaustive counting
-        for (let mask = 1; mask < (1 << numCheckPositions); mask++) {
-            let honeypotsAtPositions = 0;
-            for (let i = 0; i < numCheckPositions; i++) {
-                if (mask & (1 << i)) {
-                    honeypotsAtPositions++;
-                }
-            }
-
-            if (honeypotsAtPositions > honeypots) continue;
-
-            const remainingHoneypots = honeypots - honeypotsAtPositions;
-            const remainingPositions = totalComputers - honeypotsAtPositions;
-            const ways = binomial(remainingPositions, remainingHoneypots);
-
-            // Add or subtract based on the number of bits set (Inclusion-Exclusion)
-            // Note: This logic seems specific to a particular probability problem formulation.
-            if (honeypotsAtPositions % 2 === 1) {
-                caughtPermutations += ways;
-            } else {
-                caughtPermutations -= ways;
-            }
-        }
-
-        setTheoreticalProb(caughtPermutations / totalPermutations);
-    }, [totalComputers, honeypots, numAttacks]);
+    // State to store the theoretically calculated probability for comparison
+    const theoreticalProb = theoreticalProbability ?? null;
 
     // Main function to run the Monte Carlo simulation
     const runSimulation = async () => {

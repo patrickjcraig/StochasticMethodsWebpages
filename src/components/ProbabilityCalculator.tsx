@@ -173,6 +173,7 @@ export function ProbabilityCalculator({
         honeypots={honeypots}
         victims={victims}
         numAttacks={numAttacks}
+        theoreticalProbability={calculateProbability.probability}
       />
     </div>
   );
