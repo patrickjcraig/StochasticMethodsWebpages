@@ -88,3 +88,38 @@ npm run build
 ```
 
 This generates a `build/` folder containing the optimized HTML, CSS, and JS files. These files can be deployed to any static hosting service.
+
+## Deploying to GitHub Pages
+
+This site is deployed using GitHub Pages. As a collaborator, follow these steps to redeploy the site:
+
+### Step 1: Build the Project
+Run the build command to generate the production files:
+```bash
+npm run build
+```
+
+This creates optimized files in the `build/` directory.
+
+### Step 2: Commit and Push Changes
+After building, commit all changes including the `build/` directory:
+```bash
+git add .
+git commit -m "Deploy: Update site with latest changes"
+git push origin main
+```
+
+### Step 3: Verify Deployment
+GitHub Pages automatically serves the site from the repository. The site should be live at:
+- https://patrickjcraig.github.io/probabilityplayground.github.io/
+
+Changes may take a few minutes to appear. If the site doesn't update:
+1. Check the repository settings under Settings > Pages to ensure GitHub Pages is enabled
+2. Verify the source is set to deploy from the `main` branch (root or `/build` directory)
+3. Check for any GitHub Actions workflows that might need to complete
+
+### Quick Redeploy
+For quick redeployments:
+```bash
+npm run build && git add . && git commit -m "Redeploy site" && git push
+```
