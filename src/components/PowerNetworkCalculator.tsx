@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Zap, Calculator, Info } from 'lucide-react';
+import { PowerNetworkSimulation } from './PowerNetworkSimulation';
 
 export function PowerNetworkCalculator() {
   const [pL1, setPL1] = useState(0.88);
@@ -35,52 +36,52 @@ export function PowerNetworkCalculator() {
     // Path 4: 2 → 4 → 6
     // Path 5: 1 → 4 → 6
     // Path 6: 2 → 4 → 5
-    
+
     // Actually, let me think about this more carefully.
     // Based on typical network problems:
     // Top path: L1 → L3
     // Bottom path: L2 → L3
     // Middle path involves L4, and then L5 or L6
-    
+
     // Let's use inclusion-exclusion
     // P(power flows) = P(at least one path works)
-    
+
     // Common network structure for this type of problem:
     // Path A: L1 and L3 both work
     // Path B: L2 and L3 both work  
     // Path C: L4 and L5 both work
     // Path D: L4 and L6 both work
-    
+
     const pPathA = pL1 * pL3;
     const pPathB = pL2 * pL3;
-    
+
     // For paths C and D involving L5 and L6:
     // P(L4 ∩ L5) = P(L4) · P(L5) (assuming L4 and L5 are independent)
     const pPathC = pL4 * pL5;
-    
+
     // P(L4 ∩ L6)
     const pPathD = pL4 * pL6;
-    
+
     // P(L4 ∩ L5 ∩ L6) - we need this for inclusion-exclusion
     // P(L4) · P(L5 ∩ L6) where P(L5 ∩ L6) = P(L5|L6) · P(L6)
     const pL5andL6 = pL5GivenL6 * pL6;
     const pPathCD = pL4 * pL5andL6;
-    
+
     // Using inclusion-exclusion for Paths C and D:
     // P(C ∪ D) = P(C) + P(D) - P(C ∩ D)
     const pPath_C_or_D = pPathC + pPathD - pPathCD;
-    
+
     // Now for all paths:
     // P(A ∪ B ∪ (C∪D))
     // Since L3 is separate from L4,L5,L6 network, and L1,L2 are independent:
-    
+
     // P(A ∪ B) using inclusion-exclusion
     const pPath_A_or_B = pPathA + pPathB - (pL1 * pL2 * pL3);
-    
+
     // Assuming paths through L3 are separate from paths through L4,L5,L6:
     // P(flow) = P((A ∪ B) ∪ (C ∪ D))
     // = P(A ∪ B) + P(C ∪ D) - P((A∪B) ∩ (C∪D))
-    
+
     // If the paths are truly independent paths (parallel):
     const pPowerFlows = pPath_A_or_B + pPath_C_or_D - (pPath_A_or_B * pPath_C_or_D);
 
@@ -125,7 +126,7 @@ export function PowerNetworkCalculator() {
         </h2>
         <div className="bg-slate-900 rounded-lg p-6 mb-4">
           <pre className="text-sm text-slate-300 font-mono">
-{`         1───────3
+            {`         1───────3
         ╱│       │╲
        ╱ │       │ ╲
    Source│   5   │  Destination
@@ -136,11 +137,11 @@ export function PowerNetworkCalculator() {
         </div>
         <div className="text-sm text-slate-400 space-y-2">
           <p>
-            Power flows from Source to Destination if there exists at least one connected path 
+            Power flows from Source to Destination if there exists at least one connected path
             of functional transmission lines.
           </p>
           <p className="text-yellow-400">
-            <strong>Special dependency:</strong> Lines 5 and 6 are dependent on each other, 
+            <strong>Special dependency:</strong> Lines 5 and 6 are dependent on each other,
             but independent of all other lines.
           </p>
         </div>
@@ -216,7 +217,7 @@ export function PowerNetworkCalculator() {
           <p className="text-slate-300">
             Are events (L₁ ∩ L₂ ∩ L₃) and (L₄ ∩ L₃) statistically independent?
           </p>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-900/50 rounded p-4">
               <div className="text-sm text-slate-400 mb-1">P(L₁ ∩ L₂ ∩ L₃)</div>
@@ -228,11 +229,10 @@ export function PowerNetworkCalculator() {
             </div>
           </div>
 
-          <div className={`rounded-lg p-4 border-2 ${
-            calculations.areIndependent 
-              ? 'border-red-500/30 bg-red-900/20' 
-              : 'border-green-500/30 bg-green-900/20'
-          }`}>
+          <div className={`rounded-lg p-4 border-2 ${calculations.areIndependent
+            ? 'border-red-500/30 bg-red-900/20'
+            : 'border-green-500/30 bg-green-900/20'
+            }`}>
             <div className="text-lg mb-2">
               {calculations.areIndependent ? '✗ NOT Independent' : '✓ NOT Independent'}
             </div>
@@ -241,12 +241,12 @@ export function PowerNetworkCalculator() {
                 <strong>Reason:</strong> Both events share L₃ as a common component.
               </p>
               <p>
-                When two events share a common element, they cannot be independent because 
+                When two events share a common element, they cannot be independent because
                 the occurrence of L₃ affects both events simultaneously.
               </p>
               <div className="mt-2 text-xs text-slate-400 bg-slate-900/50 rounded p-2">
-                P(Both) = {calculations.pBothEvents.toFixed(6)}<br/>
-                P(L₁∩L₂∩L₃) × P(L₄∩L₃) = {calculations.wouldBeIfIndependent.toFixed(6)}<br/>
+                P(Both) = {calculations.pBothEvents.toFixed(6)}<br />
+                P(L₁∩L₂∩L₃) × P(L₄∩L₃) = {calculations.wouldBeIfIndependent.toFixed(6)}<br />
                 These are not equal, confirming dependence.
               </div>
             </div>
@@ -259,7 +259,7 @@ export function PowerNetworkCalculator() {
           <Calculator className="w-5 h-5" />
           Part (b): Network Reliability
         </h2>
-        
+
         <div className="space-y-4">
           <div className="text-slate-300 mb-4">
             <p className="mb-2">Analyzing possible paths from Source to Destination:</p>
@@ -302,6 +302,17 @@ export function PowerNetworkCalculator() {
           </div>
         </div>
       </div>
+
+      <PowerNetworkSimulation
+        pL1={pL1}
+        pL2={pL2}
+        pL3={pL3}
+        pL4={pL4}
+        pL6={pL6}
+        pL5GivenL6={pL5GivenL6}
+        pL5GivenNotL6={pL5GivenNotL6}
+        theoreticalProb={calculations.pPowerFlows}
+      />
 
       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
         <h3 className="text-sm mb-2">Calculation Method</h3>

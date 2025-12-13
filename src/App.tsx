@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { RefreshCw, Info, ChevronDown, ChevronUp, Shield, Dices, Zap, Video, Package, DollarSign, Spade } from 'lucide-react';
 import { SequenceVisualizer } from './components/SequenceVisualizer';
 import { ProbabilityCalculator } from './components/ProbabilityCalculator';
-import { SimulationRunner } from './components/SimulationRunner';
+
 import { PokerDice } from './components/PokerDice';
 import { PowerballCalculator } from './components/PowerballCalculator';
 import { BlackjackCalculator } from './components/BlackjackCalculator';
@@ -28,13 +28,13 @@ export default function App() {
       ...Array(honeypots).fill('H'),
       ...Array(victims).fill('V')
     ];
-    
+
     // Fisher-Yates shuffle
     for (let i = computers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [computers[i], computers[j]] = [computers[j], computers[i]];
     }
-    
+
     setCurrentSequence(computers.join(''));
   }, [honeypots, victims]);
 
@@ -55,11 +55,10 @@ export default function App() {
         <button
           key={id}
           onClick={() => setCurrentPage(id)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
-            currentPage === id
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
+          className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${currentPage === id
+            ? 'bg-blue-600 text-white'
+            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
         >
           <Icon className="w-4 h-4" />
           {label}
@@ -173,34 +172,34 @@ export default function App() {
               <ChevronDown className="w-5 h-5 text-slate-400" />
             )}
           </button>
-          
+
           {showExplanation && (
             <div className="px-6 pb-6 space-y-3 text-slate-300">
               <p>
-                A hacker attacks a network with <strong>{totalComputers}</strong> computers, 
-                of which <strong>{honeypots}</strong> are honeypots (H) and <strong>{victims}</strong> are 
+                A hacker attacks a network with <strong>{totalComputers}</strong> computers,
+                of which <strong>{honeypots}</strong> are honeypots (H) and <strong>{victims}</strong> are
                 regular victims (V).
               </p>
               <p>
-                <strong>Modified Game Rules:</strong> The game always involves exactly <strong>{numAttacks}</strong> attacks. 
+                <strong>Modified Game Rules:</strong> The game always involves exactly <strong>{numAttacks}</strong> attacks.
                 Each attack selects 2 computers from the remaining pool.
               </p>
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>
-                  <strong>Attack Detected:</strong> If the first computer selected in an attack is a honeypot, 
+                  <strong>Attack Detected:</strong> If the first computer selected in an attack is a honeypot,
                   the attack is detected. The hacker still selects a second computer, then starts a new attack.
                 </li>
                 <li>
-                  <strong>Hacker Wins:</strong> If the first computer is a victim AND the second is a honeypot, 
+                  <strong>Hacker Wins:</strong> If the first computer is a victim AND the second is a honeypot,
                   the hacker gains control of the honeypot system and wins.
                 </li>
               </ul>
               <p>
-                Since all {totalComputers} computers are eventually selected, we get a {totalComputers}-tuple like: 
+                Since all {totalComputers} computers are eventually selected, we get a {totalComputers}-tuple like:
                 <code className="bg-slate-900 px-2 py-1 rounded mx-2">VVVVHHVVVH</code>
               </p>
               <p>
-                The hacker is caught if a honeypot appears at positions <strong>1, 3, 5, 7, ...</strong> (odd positions 
+                The hacker is caught if a honeypot appears at positions <strong>1, 3, 5, 7, ...</strong> (odd positions
                 up to 2×{numAttacks}-1). These are the "first picks" of each attack.
               </p>
             </div>
@@ -212,8 +211,8 @@ export default function App() {
             <label className="block mb-2 text-slate-300">Total Computers</label>
             <input
               type="range"
-              min="4"
-              max="20"
+              min="2"
+              max="50"
               value={totalComputers}
               onChange={(e) => setTotalComputers(Number(e.target.value))}
               className="w-full"
@@ -225,7 +224,7 @@ export default function App() {
             <label className="block mb-2 text-slate-300">Honeypots</label>
             <input
               type="range"
-              min="1"
+              min="0"
               max={Math.floor(totalComputers * 0.8)}
               value={honeypots}
               onChange={(e) => setHoneypots(Number(e.target.value))}
@@ -259,21 +258,14 @@ export default function App() {
               Generate New
             </button>
           </div>
-          <SequenceVisualizer 
-            sequence={currentSequence} 
+          <SequenceVisualizer
+            sequence={currentSequence}
             numAttacks={numAttacks}
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="max-w-5xl mx-auto">
           <ProbabilityCalculator
-            totalComputers={totalComputers}
-            honeypots={honeypots}
-            victims={victims}
-            numAttacks={numAttacks}
-          />
-
-          <SimulationRunner
             totalComputers={totalComputers}
             honeypots={honeypots}
             victims={victims}

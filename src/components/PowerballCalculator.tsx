@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Calculator, ExternalLink } from 'lucide-react';
+import { PowerballSimulation } from './PowerballSimulation';
 
 export function PowerballCalculator() {
   const [showDetails, setShowDetails] = useState(true);
@@ -161,9 +162,8 @@ export function PowerballCalculator() {
                     <div className="text-lg text-slate-100">{prize.name}</div>
                     <div className="text-sm text-slate-400">{prize.description}</div>
                   </div>
-                  <div className={`px-2 py-1 rounded text-xs ${
-                    matches ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
-                  }`}>
+                  <div className={`px-2 py-1 rounded text-xs ${matches ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
+                    }`}>
                     {matches ? '✓ Matches' : '✗ Differs'}
                   </div>
                 </div>
@@ -200,6 +200,8 @@ export function PowerballCalculator() {
           })}
         </div>
       </div>
+
+      <PowerballSimulation />
 
       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
         <h3 className="text-sm mb-2">Calculation Notes</h3>

@@ -1,10 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Spade, Heart, Calculator } from 'lucide-react';
+import { BlackjackSimulation } from './BlackjackSimulation';
 
 export function BlackjackCalculator() {
-  const [showSimulation, setShowSimulation] = useState(false);
-  const [simResults, setSimResults] = useState<{ blackjacks: number; total: number } | null>(null);
-
   const factorial = (n: number): number => {
     if (n <= 1) return 1;
     let result = 1;
@@ -29,7 +27,7 @@ export function BlackjackCalculator() {
     // Ten-value cards: 16 cards (4 tens + 4 jacks + 4 queens + 4 kings)
     const aces = 4;
     const tenValues = 16;
-    
+
     // Ways to get blackjack:
     // Choose 1 ace from 4, and 1 ten-value from 16
     // Can pick ace first or ten-value first, so: 2 × (4 × 16)
@@ -49,35 +47,6 @@ export function BlackjackCalculator() {
       expectedProbability: 128 / 2652
     };
   }, []);
-
-  const runSimulation = () => {
-    const numSims = 100000;
-    let blackjacks = 0;
-
-    for (let i = 0; i < numSims; i++) {
-      const deck: string[] = [];
-      
-      // Create deck
-      for (let suit = 0; suit < 4; suit++) {
-        for (let rank = 1; rank <= 13; rank++) {
-          deck.push(rank === 1 ? 'A' : (rank >= 10 ? 'T' : 'X'));
-        }
-      }
-
-      // Shuffle and draw 2 cards
-      const shuffled = [...deck].sort(() => Math.random() - 0.5);
-      const card1 = shuffled[0];
-      const card2 = shuffled[1];
-
-      // Check for blackjack
-      if ((card1 === 'A' && card2 === 'T') || (card1 === 'T' && card2 === 'A')) {
-        blackjacks++;
-      }
-    }
-
-    setSimResults({ blackjacks, total: numSims });
-    setShowSimulation(true);
-  };
 
   const matches = Math.abs(calculations.blackjackWays - calculations.expectedNumerator) === 0;
 
@@ -101,7 +70,7 @@ export function BlackjackCalculator() {
             Two cards are randomly drawn from an ordinary 52-card deck (no jokers).
           </p>
           <p>
-            <strong>Blackjack:</strong> One card is an Ace, and the other is a ten-value card 
+            <strong>Blackjack:</strong> One card is an Ace, and the other is a ten-value card
             (10, Jack, Queen, or King)
           </p>
           <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
@@ -137,14 +106,12 @@ export function BlackjackCalculator() {
             <div className="text-xs text-slate-500 mt-1">= (# Aces) × (# Ten-values) = 4 × 16</div>
           </div>
 
-          <div className={`rounded-lg p-4 border ${
-            matches ? 'border-green-500/30 bg-green-900/20' : 'border-red-500/30 bg-red-900/20'
-          }`}>
+          <div className={`rounded-lg p-4 border ${matches ? 'border-green-500/30 bg-green-900/20' : 'border-red-500/30 bg-red-900/20'
+            }`}>
             <div className="flex justify-between items-start mb-3">
               <div className="text-lg">Calculated Probability</div>
-              <div className={`px-2 py-1 rounded text-xs ${
-                matches ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
-              }`}>
+              <div className={`px-2 py-1 rounded text-xs ${matches ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
+                }`}>
                 {matches ? '✓ Matches Expected' : '✗ Differs'}
               </div>
             </div>
@@ -179,42 +146,7 @@ export function BlackjackCalculator() {
         </div>
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
-        <h2 className="text-xl mb-4">Monte Carlo Verification</h2>
-        
-        <button
-          onClick={runSimulation}
-          className="w-full bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors mb-4"
-        >
-          Run 100,000 Simulations
-        </button>
-
-        {showSimulation && simResults && (
-          <div className="space-y-3">
-            <div className="bg-slate-900/50 rounded p-4">
-              <div className="text-sm text-slate-400 mb-1">Blackjacks dealt:</div>
-              <div className="text-2xl">{simResults.blackjacks.toLocaleString()}</div>
-            </div>
-
-            <div className="bg-slate-900/50 rounded p-4">
-              <div className="text-sm text-slate-400 mb-1">Simulated Probability:</div>
-              <div className="text-2xl">
-                {((simResults.blackjacks / simResults.total) * 100).toFixed(4)}%
-              </div>
-              <div className="text-sm text-slate-500 mt-1">
-                {simResults.blackjacks} / {simResults.total.toLocaleString()}
-              </div>
-            </div>
-
-            <div className="bg-slate-900/50 rounded p-4">
-              <div className="text-sm text-slate-400 mb-1">Error from expected:</div>
-              <div className="text-lg">
-                {Math.abs((simResults.blackjacks / simResults.total - calculations.expectedProbability) * 100).toFixed(4)}%
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <BlackjackSimulation theoreticalProb={calculations.expectedProbability} />
 
       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
         <h3 className="text-sm mb-2">Why 128/2652 ≠ 64/1326?</h3>

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { PlayCircle, StopCircle, BarChart3 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { PlayCircle, StopCircle, BarChart3, RotateCcw } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface PokerDiceSimulationProps {
   numDice: number;
@@ -9,6 +9,13 @@ interface PokerDiceSimulationProps {
 export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
   const [numSimulations, setNumSimulations] = useState(100000);
   const [isRunning, setIsRunning] = useState(false);
+  const [simulationSpeed, setSimulationSpeed] = useState(100); // 0-100 (100 is max speed)
+  const speedRef = React.useRef(simulationSpeed);
+
+  useEffect(() => {
+    speedRef.current = simulationSpeed;
+  }, [simulationSpeed]);
+
   const [results, setResults] = useState<{
     total: number;
     counts: { [key: string]: number };
@@ -29,7 +36,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
     const counts = new Map<number, number>();
     dice.forEach(d => counts.set(d, (counts.get(d) || 0) + 1));
     const frequencies = Array.from(counts.values()).sort((a, b) => b - a);
-    
+
     if (frequencies[0] === 5) return 'Five Alike';
     if (frequencies[0] === 4) return 'Four Alike';
     if (frequencies[0] === 3 && frequencies[1] === 2) return 'Full House';
@@ -53,7 +60,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
       'Five Alike': 0,
     };
 
-    const batchSize = 10000;
+    const batchSize = 1000; // Smaller batches for smoother animation when slowed
     const totalBatches = Math.ceil(numSimulations / batchSize);
 
     for (let batch = 0; batch < totalBatches; batch++) {
@@ -66,22 +73,26 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
         counts[handType]++;
       }
 
-      // Allow UI to update
-      await new Promise(resolve => setTimeout(resolve, 0));
+      const currentProbabilities: { [key: string]: number } = {};
+      Object.keys(counts).forEach(key => {
+        currentProbabilities[key] = counts[key] / batchEnd;
+      });
+
+      setResults({
+        total: batchEnd,
+        counts: { ...counts },
+        probabilities: currentProbabilities
+      });
+
+      // Allow UI to update and throttle based on speed
+      // Speed 100 -> 0ms delay. Speed 1 -> 100ms delay.
+      const delay = Math.max(0, 100 - speedRef.current);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
 
-    const probabilities: { [key: string]: number } = {};
-    Object.keys(counts).forEach(key => {
-      probabilities[key] = counts[key] / numSimulations;
-    });
-
-    setResults({
-      total: numSimulations,
-      counts,
-      probabilities,
-    });
     setIsRunning(false);
   };
+
 
   const getBarColor = (handType: string) => {
     const colors: { [key: string]: string } = {
@@ -125,12 +136,12 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
 
   const chartData = results
     ? handOrder.map(hand => ({
-        hand: hand.replace(' ', '\n'),
-        simulated: results.probabilities[hand],
-        expected: expectedValues[hand],
-        count: results.counts[hand],
-        color: getBarColor(hand)
-      }))
+      hand: hand.replace(' ', '\n'),
+      simulated: results.probabilities[hand],
+      expected: expectedValues[hand],
+      count: results.counts[hand],
+      color: getBarColor(hand)
+    }))
     : [];
 
   return (
@@ -176,23 +187,48 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
           </div>
         </div>
 
-        <button
-          onClick={runSimulation}
-          disabled={isRunning}
-          className="w-full flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-900 disabled:cursor-not-allowed px-6 py-3 rounded-lg transition-colors"
-        >
-          {isRunning ? (
-            <>
-              <StopCircle className="w-5 h-5 animate-spin" />
-              Running...
-            </>
-          ) : (
-            <>
-              <PlayCircle className="w-5 h-5" />
-              Run Simulation
-            </>
-          )}
-        </button>
+        {/* Speed Control */}
+        <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded mb-6">
+          <span className="text-xs text-slate-400 w-12">Speed</span>
+          <input
+            type="range"
+            min="1"
+            max="100"
+            value={simulationSpeed}
+            onChange={(e) => setSimulationSpeed(Number(e.target.value))}
+            disabled={isRunning}
+            className="flex-1 accent-blue-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+          />
+          <span className="text-xs text-slate-400 w-8 text-right">{simulationSpeed}%</span>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={runSimulation}
+            disabled={isRunning}
+            className="flex-1 flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-700 disabled:bg-slate-900 disabled:cursor-not-allowed px-6 py-3 rounded-lg transition-colors"
+          >
+            {isRunning ? (
+              <>
+                <StopCircle className="w-5 h-5 animate-spin" />
+                Running...
+              </>
+            ) : (
+              <>
+                <PlayCircle className="w-5 h-5" />
+                Run Simulation
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setResults(null)}
+            disabled={isRunning || !results}
+            className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 rounded-lg transition-colors"
+            title="Reset Results"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+        </div>
 
         {results && (
           <div className="space-y-4">
@@ -265,7 +301,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
             <div className="bg-slate-900/50 rounded p-4">
               <div className="text-sm text-slate-300 mb-2">Average Absolute Error</div>
               <div className="text-2xl">
-                {(handOrder.reduce((sum, hand) => 
+                {(handOrder.reduce((sum, hand) =>
                   sum + Math.abs(results.probabilities[hand] - expectedValues[hand]), 0
                 ) / handOrder.length * 100).toFixed(4)}%
               </div>

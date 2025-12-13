@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Dices, RefreshCw } from 'lucide-react';
 import { PokerDiceCalculator } from './PokerDiceCalculator';
-import { PokerDiceSimulation } from './PokerDiceSimulation';
+
 
 export function PokerDice() {
   const [numDice, setNumDice] = useState(5);
@@ -16,7 +16,7 @@ export function PokerDice() {
     const counts = new Map<number, number>();
     dice.forEach(d => counts.set(d, (counts.get(d) || 0) + 1));
     const frequencies = Array.from(counts.values()).sort((a, b) => b - a);
-    
+
     if (frequencies[0] === 5) return 'Five Alike';
     if (frequencies[0] === 4) return 'Four Alike';
     if (frequencies[0] === 3 && frequencies[1] === 2) return 'Full House';
@@ -46,7 +46,7 @@ export function PokerDice() {
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mb-8">
         <h2 className="text-xl mb-4">Problem Statement</h2>
         <p className="text-slate-200 mb-3">
-          Poker dice is played by simultaneously rolling <strong>{numDice}</strong> dice. 
+          Poker dice is played by simultaneously rolling <strong>{numDice}</strong> dice.
           Calculate the probability of each possible outcome:
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-slate-200">
@@ -86,7 +86,7 @@ export function PokerDice() {
               Roll Dice
             </button>
           </div>
-          
+
           <div className="flex items-center justify-center gap-4 mb-4">
             {currentRoll.map((die, i) => (
               <div
@@ -97,7 +97,7 @@ export function PokerDice() {
               </div>
             ))}
           </div>
-          
+
           <div className="text-center">
             <div className="text-sm text-slate-300 mb-1">Result:</div>
             <div className="text-2xl text-slate-200">{analyzeRoll(currentRoll)}</div>
@@ -108,9 +108,8 @@ export function PokerDice() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="max-w-4xl mx-auto">
         <PokerDiceCalculator numDice={numDice} />
-        <PokerDiceSimulation numDice={numDice} />
       </div>
     </div>
   );

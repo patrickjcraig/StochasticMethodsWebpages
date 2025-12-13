@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Package, Calculator, AlertCircle } from 'lucide-react';
+import { PacketErrorSimulation } from './PacketErrorSimulation';
 
 export function PacketErrorCalculator() {
   const [totalPackets] = useState(100);
@@ -24,7 +25,7 @@ export function PacketErrorCalculator() {
 
   const scenarioACalc = useMemo(() => {
     // Scenario A: Test 2 packets, retransmit if EITHER has errors
-    
+
     const calc5 = (errorPackets: number) => {
       const goodPackets = totalPackets - errorPackets;
       // Total ways to choose 2 from 100
@@ -48,20 +49,20 @@ export function PacketErrorCalculator() {
   const scenarioBCalc = useMemo(() => {
     // Scenario B: Test 3 packets, retransmit if MORE THAN ONE has errors
     // Don't retransmit if: 0 errors OR exactly 1 error
-    
+
     const calc = (errorPackets: number) => {
       const goodPackets = totalPackets - errorPackets;
       const totalWays = binomial(totalPackets, 3);
-      
+
       // Ways to choose 3 packets without error
       const zeroErrorWays = binomial(goodPackets, 3);
-      
+
       // Ways to choose exactly 1 packet with error and 2 without
       const oneErrorWays = binomial(errorPackets, 1) * binomial(goodPackets, 2);
-      
+
       const noRetransmitWays = zeroErrorWays + oneErrorWays;
       const probNoRetransmit = noRetransmitWays / totalWays;
-      
+
       return { totalWays, zeroErrorWays, oneErrorWays, noRetransmitWays, probNoRetransmit };
     };
 
@@ -98,7 +99,7 @@ export function PacketErrorCalculator() {
             A large image is split into <strong>100 packets</strong> and transmitted over a noisy channel.
           </p>
           <p>
-            Each packet contains an error-detecting code, but the receiver only tests a specified 
+            Each packet contains an error-detecting code, but the receiver only tests a specified
             number of packets for errors.
           </p>
         </div>
@@ -109,11 +110,10 @@ export function PacketErrorCalculator() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button
             onClick={() => setScenario('a')}
-            className={`p-4 rounded-lg border-2 transition-all ${
-              scenario === 'a'
-                ? 'border-blue-500 bg-blue-900/30'
-                : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
-            }`}
+            className={`p-4 rounded-lg border-2 transition-all ${scenario === 'a'
+              ? 'border-blue-500 bg-blue-900/30'
+              : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
+              }`}
           >
             <div className="text-lg mb-2">Scenario A</div>
             <div className="text-sm text-slate-400">Test 2 packets</div>
@@ -121,11 +121,10 @@ export function PacketErrorCalculator() {
           </button>
           <button
             onClick={() => setScenario('b')}
-            className={`p-4 rounded-lg border-2 transition-all ${
-              scenario === 'b'
-                ? 'border-blue-500 bg-blue-900/30'
-                : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
-            }`}
+            className={`p-4 rounded-lg border-2 transition-all ${scenario === 'b'
+              ? 'border-blue-500 bg-blue-900/30'
+              : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
+              }`}
           >
             <div className="text-lg mb-2">Scenario B</div>
             <div className="text-sm text-slate-400">Test 3 packets</div>
@@ -272,15 +271,17 @@ export function PacketErrorCalculator() {
         </div>
       </div>
 
+      <PacketErrorSimulation />
+
       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
         <h3 className="text-sm mb-3">Key Insights</h3>
         <div className="text-xs text-slate-400 space-y-2">
           <p>
-            <strong>Scenario A:</strong> As error packets increase from 5 to 10, the probability 
+            <strong>Scenario A:</strong> As error packets increase from 5 to 10, the probability
             of avoiding retransmission drops from ~90% to ~81% (testing 2 packets).
           </p>
           <p>
-            <strong>Scenario B:</strong> Testing 3 packets with a tolerance of 1 error provides 
+            <strong>Scenario B:</strong> Testing 3 packets with a tolerance of 1 error provides
             much higher reliability: ~99.4% for 5 errors and ~97.4% for 10 errors.
           </p>
           <p className="text-blue-400">

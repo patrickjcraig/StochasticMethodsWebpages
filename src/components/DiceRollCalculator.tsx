@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Dices, Calculator } from 'lucide-react';
+import { DiceRollSimulation } from './DiceRollSimulation';
 
 export function DiceRollCalculator() {
   const [targetProb, setTargetProb] = useState(0.95);
@@ -10,7 +11,7 @@ export function DiceRollCalculator() {
     // P(outcome > 4) = P(5 or 6) = 2/6 = 1/3
     // P(outcome = 6) = 1/6
 
-    const pSuccess = criterion === 'gt4' ? 2/6 : 1/6;
+    const pSuccess = criterion === 'gt4' ? 2 / 6 : 1 / 6;
     const pFail = 1 - pSuccess;
 
     // We want P(at least one success in M rolls) >= targetProb
@@ -55,29 +56,28 @@ export function DiceRollCalculator() {
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
         <h2 className="text-xl mb-4">Problem Setup</h2>
         <p className="text-slate-300 mb-4">
-          How many times M must we roll a fair die to have at least a certain probability of seeing 
+          How many times M must we roll a fair die to have at least a certain probability of seeing
           a specific outcome at least once?
         </p>
         <div className="text-sm text-slate-400 bg-slate-900/50 rounded p-3">
-          <strong>Formula:</strong> If we want P(at least one success) ≥ p, then:<br/>
+          <strong>Formula:</strong> If we want P(at least one success) ≥ p, then:<br />
           M ≥ log(1 - p) / log(P(failure))
         </div>
       </div>
 
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
         <h2 className="text-xl mb-4">Parameters</h2>
-        
+
         <div className="space-y-4">
           <div>
             <label className="block text-sm text-slate-400 mb-2">Success Criterion</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setCriterion('gt4')}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  criterion === 'gt4'
-                    ? 'border-blue-500 bg-blue-900/30'
-                    : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
-                }`}
+                className={`p-3 rounded-lg border-2 transition-all ${criterion === 'gt4'
+                  ? 'border-blue-500 bg-blue-900/30'
+                  : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
+                  }`}
               >
                 <div className="text-lg mb-1">Outcome &gt; 4</div>
                 <div className="text-xs text-slate-400">(roll a 5 or 6)</div>
@@ -85,11 +85,10 @@ export function DiceRollCalculator() {
               </button>
               <button
                 onClick={() => setCriterion('eq6')}
-                className={`p-3 rounded-lg border-2 transition-all ${
-                  criterion === 'eq6'
-                    ? 'border-blue-500 bg-blue-900/30'
-                    : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
-                }`}
+                className={`p-3 rounded-lg border-2 transition-all ${criterion === 'eq6'
+                  ? 'border-blue-500 bg-blue-900/30'
+                  : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
+                  }`}
               >
                 <div className="text-lg mb-1">Outcome = 6</div>
                 <div className="text-xs text-slate-400">(roll a 6)</div>
@@ -105,11 +104,10 @@ export function DiceRollCalculator() {
                 <button
                   key={target.label}
                   onClick={() => setTargetProb(target.value)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    targetProb === target.value
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
+                  className={`px-3 py-1 rounded text-sm ${targetProb === target.value
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
                 >
                   {target.label}
                 </button>
@@ -171,14 +169,15 @@ export function DiceRollCalculator() {
           <div className="text-xs text-slate-500 mt-1">
             = 1 - ({calculations.pFail.toFixed(4)})^{calculations.M}
           </div>
-          <div className={`text-sm mt-2 ${
-            calculations.actualProb >= calculations.targetProb ? 'text-green-400' : 'text-red-400'
-          }`}>
-            {calculations.actualProb >= calculations.targetProb ? '✓' : '✗'} 
+          <div className={`text-sm mt-2 ${calculations.actualProb >= calculations.targetProb ? 'text-green-400' : 'text-red-400'
+            }`}>
+            {calculations.actualProb >= calculations.targetProb ? '✓' : '✗'}
             {' '}Meets target of {(calculations.targetProb * 100).toFixed(2)}%
           </div>
         </div>
       </div>
+
+      <DiceRollSimulation />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
@@ -187,13 +186,13 @@ export function DiceRollCalculator() {
             <div className="bg-slate-900/50 rounded p-3">
               <div className="text-slate-400 mb-1">(a) Outcome &gt; 4, P ≥ 0.95</div>
               <div className="text-xl text-green-300">
-                M = {Math.ceil(Math.log(1 - 0.95) / Math.log(2/3))} rolls
+                M = {Math.ceil(Math.log(1 - 0.95) / Math.log(2 / 3))} rolls
               </div>
             </div>
             <div className="bg-slate-900/50 rounded p-3">
               <div className="text-slate-400 mb-1">(b) Outcome &gt; 4, P ≥ 0.999</div>
               <div className="text-xl text-green-300">
-                M = {Math.ceil(Math.log(1 - 0.999) / Math.log(2/3))} rolls
+                M = {Math.ceil(Math.log(1 - 0.999) / Math.log(2 / 3))} rolls
               </div>
             </div>
           </div>
@@ -205,13 +204,13 @@ export function DiceRollCalculator() {
             <div className="bg-slate-900/50 rounded p-3">
               <div className="text-slate-400 mb-1">(c) Outcome = 6, P ≥ 0.95</div>
               <div className="text-xl text-purple-300">
-                M = {Math.ceil(Math.log(1 - 0.95) / Math.log(5/6))} rolls
+                M = {Math.ceil(Math.log(1 - 0.95) / Math.log(5 / 6))} rolls
               </div>
             </div>
             <div className="bg-slate-900/50 rounded p-3">
               <div className="text-slate-400 mb-1">(d) Outcome = 6, P ≥ 0.999</div>
               <div className="text-xl text-purple-300">
-                M = {Math.ceil(Math.log(1 - 0.999) / Math.log(5/6))} rolls
+                M = {Math.ceil(Math.log(1 - 0.999) / Math.log(5 / 6))} rolls
               </div>
             </div>
           </div>
@@ -222,7 +221,7 @@ export function DiceRollCalculator() {
         <h3 className="text-sm mb-2">Understanding the Formula</h3>
         <div className="text-xs text-slate-400 space-y-2">
           <p>
-            <strong>Why this works:</strong> The probability of getting at least one success in M rolls 
+            <strong>Why this works:</strong> The probability of getting at least one success in M rolls
             is the complement of getting all failures.
           </p>
           <p>

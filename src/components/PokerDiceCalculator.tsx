@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Calculator } from 'lucide-react';
+import { PokerDiceSimulation } from './PokerDiceSimulation';
 
 interface PokerDiceCalculatorProps {
   numDice: number;
@@ -23,32 +24,32 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
 
   const calculateProbabilities = useMemo(() => {
     const totalOutcomes = Math.pow(6, numDice);
-    
+
     // Five alike: Choose 1 value, all dice show that value
     const fiveAlike = numDice === 5 ? 6 : 0;
-    
+
     // Four alike: Choose 1 value for four, 1 position for the different die, 5 values for it
     const fourAlike = numDice === 5 ? binomial(5, 4) * 6 * 5 : 0;
-    
+
     // Full house: Choose 1 value for three, 1 value for two, arrange them
     const fullHouse = numDice === 5 ? binomial(5, 3) * 6 * 5 : 0;
-    
+
     // Three alike (but not full house or better)
     // Choose 1 value for three, positions for three, 2 different values for remaining 2
-    const threeAlike = numDice === 5 
-      ? 6 * binomial(5, 3) * 5 * 4 
+    const threeAlike = numDice === 5
+      ? 6 * binomial(5, 3) * 5 * 4
       : 0;
-    
+
     // Two pair: Choose 2 values for pairs, positions for first pair, positions for second pair, 1 value for last die
-    const twoPair = numDice === 5 
-      ? binomial(6, 2) * binomial(5, 2) * binomial(3, 2) * 4 
+    const twoPair = numDice === 5
+      ? binomial(6, 2) * binomial(5, 2) * binomial(3, 2) * 4
       : 0;
-    
+
     // One pair: Choose 1 value for pair, positions for pair, 3 different values for remaining dice
-    const onePair = numDice === 5 
-      ? 6 * binomial(5, 2) * 5 * 4 * 3 
+    const onePair = numDice === 5
+      ? 6 * binomial(5, 2) * 5 * 4 * 3
       : 0;
-    
+
     // No two alike: Choose 5 different values, arrange them
     const noTwoAlike = numDice === 5 ? binomial(6, 5) * factorial(5) : 0;
 
@@ -166,10 +167,11 @@ export function PokerDiceCalculator({ numDice }: PokerDiceCalculatorProps) {
         </div>
 
         <div className="text-xs text-slate-400 italic bg-slate-900/30 rounded p-3">
-          <strong>Note:</strong> Calculations use combinations and permutations. 
-          For example, "One Pair" = C(6,1) × C(5,2) × P(5,3) where we choose 1 value for the pair, 
+          <strong>Note:</strong> Calculations use combinations and permutations.
+          For example, "One Pair" = C(6,1) × C(5,2) × P(5,3) where we choose 1 value for the pair,
           2 positions for it, and arrange 3 different values in remaining positions.
         </div>
+        <PokerDiceSimulation numDice={numDice} />
       </div>
     </div>
   );

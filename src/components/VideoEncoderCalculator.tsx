@@ -1,14 +1,15 @@
 import React, { useMemo } from 'react';
 import { Video, Calculator } from 'lucide-react';
+import { VideoEncoderSimulation } from './VideoEncoderSimulation';
 
 export function VideoEncoderCalculator() {
   const probabilities = useMemo(() => {
     return {
-      100: 1/2,
-      200: 1/4,
-      300: 1/8,
-      400: 1/16,
-      500: 1/16
+      100: 1 / 2,
+      200: 1 / 4,
+      300: 1 / 8,
+      400: 1 / 16,
+      500: 1 / 16
     };
   }, []);
 
@@ -276,14 +277,16 @@ export function VideoEncoderCalculator() {
           </p>
           <p>
             <strong>Union formula check:</strong> P(J ∪ K) = P(J) + P(K) - P(J ∩ K)
-            <br/>= 4/16 + 5/16 - 1/16 = 8/16 = 1/2 ✓
+            <br />= 4/16 + 5/16 - 1/16 = 8/16 = 1/2 ✓
           </p>
           <p>
-            <strong>Note:</strong> Event J̄ ∩ K represents packets that are multiples of 200 but less than 300, 
+            <strong>Note:</strong> Event J̄ ∩ K represents packets that are multiples of 200 but less than 300,
             which is only the 200-byte packet.
           </p>
         </div>
       </div>
+
+      <VideoEncoderSimulation />
     </div>
   );
 }
