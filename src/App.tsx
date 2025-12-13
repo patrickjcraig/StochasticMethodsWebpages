@@ -218,6 +218,9 @@ export default function App() {
                 const newTotal = Number(e.target.value);
                 setTotalComputers(newTotal);
                 setNumAttacks(Math.floor(newTotal / 2));
+                if (honeypots > newTotal - 1) {
+                  setHoneypots(newTotal - 1);
+                }
               }}
               className="w-full"
             />
@@ -229,7 +232,7 @@ export default function App() {
             <input
               type="range"
               min="0"
-              max={Math.floor(totalComputers * 0.8)}
+              max={totalComputers - 1}
               value={honeypots}
               onChange={(e) => setHoneypots(Number(e.target.value))}
               className="w-full"
