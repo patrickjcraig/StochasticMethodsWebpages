@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Dices, RefreshCw, Play, Pause, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Dices, RefreshCw, Play, Pause, RotateCcw, Activity } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export function DiceRollSimulation() {
     const [numRolls, setNumRolls] = useState(13); // Default example M value
@@ -7,18 +8,30 @@ export function DiceRollSimulation() {
     const [rolls, setRolls] = useState<number[]>([]);
     const [success, setSuccess] = useState(false);
     const [hasRun, setHasRun] = useState(false);
+    const [showGraph, setShowGraph] = useState(false);
 
     // Autoplay
     const [isAutoPlaying, setIsAutoPlaying] = useState(false);
     const [simulationSpeed, setSimulationSpeed] = useState(10);
     const [stats, setStats] = useState({ attempts: 0, successes: 0 });
+    const [history, setHistory] = useState<Array<{ count: number; simulated: number; theoretical: number }>>([]);
+
+    // Use ref for stats to avoid stale closures in setInterval without resetting it constantly
+    const statsRef = React.useRef(stats);
+    useEffect(() => {
+        statsRef.current = stats;
+    }, [stats]);
+
+    // Reset when parameters change
+    useEffect(() => {
+        reset();
+    }, [numRolls, target]);
 
     const runSimulation = () => {
         const newRolls = Array.from({ length: numRolls }, () => Math.floor(Math.random() * 6) + 1);
         setRolls(newRolls);
 
         // Check success
-        // Success = at least one outcome meeting the criterion
         const isSuccess = newRolls.some(r => {
             if (target === 'gt4') return r > 4; // 5 or 6
             if (target === 'eq6') return r === 6;
@@ -28,12 +41,28 @@ export function DiceRollSimulation() {
         setSuccess(isSuccess);
         setHasRun(true);
 
-        if (isAutoPlaying) {
-            setStats(prev => ({
-                attempts: prev.attempts + 1,
-                successes: prev.successes + (isSuccess ? 1 : 0)
-            }));
-        }
+        // Update stats using Ref to ensure we always have latest values even inside interval
+        const currentStats = statsRef.current;
+        const newAttempts = currentStats.attempts + 1;
+        const newSuccesses = currentStats.successes + (isSuccess ? 1 : 0);
+        const newStats = { attempts: newAttempts, successes: newSuccesses };
+
+        // Update Ref immediately so next tick sees it
+        statsRef.current = newStats;
+        setStats(newStats);
+
+        const simulatedProb = newSuccesses / newAttempts;
+        const pFail = target === 'gt4' ? 4 / 6 : 5 / 6;
+        const theoreticalProb = 1 - Math.pow(pFail, numRolls);
+
+        setHistory(prevHist => [
+            ...prevHist,
+            {
+                count: newAttempts,
+                simulated: simulatedProb,
+                theoretical: theoreticalProb
+            }
+        ]);
     };
 
     useEffect(() => {
@@ -43,18 +72,26 @@ export function DiceRollSimulation() {
         }
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAutoPlaying, simulationSpeed, numRolls, target]);
+    }, [isAutoPlaying, simulationSpeed, numRolls, target]); // Removed stats dependency to prevent interval reset
 
     const reset = () => {
         setStats({ attempts: 0, successes: 0 });
+        setHistory([]);
         setIsAutoPlaying(false);
         setHasRun(false);
         setRolls([]);
+        statsRef.current = { attempts: 0, successes: 0 };
     };
 
     const getDieFace = (val: number) => {
         return ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][val - 1];
     };
+
+    // Calculate theoretical for display
+    const currentTheoretical = useMemo(() => {
+        const pFail = target === 'gt4' ? 4 / 6 : 5 / 6;
+        return 1 - Math.pow(pFail, numRolls);
+    }, [target, numRolls]);
 
     return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mt-8">
@@ -134,48 +171,118 @@ export function DiceRollSimulation() {
                         {isAutoPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                         {isAutoPlaying ? 'Stop Auto' : 'Start Auto'}
                     </button>
+                    <button
+                        onClick={reset}
+                        className="px-4 bg-slate-700 hover:bg-slate-600 rounded-lg flex items-center justify-center transition-colors"
+                        title="Reset"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                    </button>
                 </div>
             </div>
 
-            {stats.attempts > 0 && (
-                <div className="bg-slate-900/50 rounded p-4 mb-6 text-sm text-slate-300 flex justify-between">
-                    <span>Total Runs: {stats.attempts}</span>
-                    <span>Success Rate: {((stats.successes / stats.attempts) * 100).toFixed(2)}%</span>
-                    <button onClick={reset} className="text-slate-500 hover:text-white"><RotateCcw className="w-4 h-4" /></button>
-                </div>
-            )}
-
             {hasRun && (
-                <div className="space-y-4">
-                    <div className="flex flex-wrap gap-2 justify-center">
-                        {rolls.map((val, i) => {
-                            const isHit = target === 'gt4' ? val > 4 : val === 6;
-                            return (
-                                <div
-                                    key={i}
-                                    className={`w-10 h-10 flex items-center justify-center text-3xl rounded ${isHit ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-slate-900/50 text-slate-500'
-                                        }`}
-                                >
-                                    {getDieFace(val)}
-                                </div>
-                            );
-                        })}
+                <div className="space-y-6">
+                    {/* Current Roll Visualization */}
+                    <div className="bg-slate-900/50 p-4 rounded-lg">
+                        <div className="text-sm text-slate-400 mb-2">Current Roll Outcomes</div>
+                        <div className="flex flex-wrap gap-2 justify-center mb-4">
+                            {rolls.map((val, i) => {
+                                const isHit = target === 'gt4' ? val > 4 : val === 6;
+                                return (
+                                    <div
+                                        key={i}
+                                        className={`w-10 h-10 flex items-center justify-center text-3xl rounded ${isHit ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-slate-900/50 text-slate-500'
+                                            }`}
+                                    >
+                                        {getDieFace(val)}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className={`p-2 rounded text-center border ${success ? 'bg-green-900/20 border-green-500/30' : 'bg-red-900/20 border-red-500/30'
+                            }`}>
+                            <span className={success ? 'text-green-400' : 'text-red-400'}>
+                                {success ? 'Success!' : 'Failure'}
+                            </span>
+                            <span className="text-slate-400 text-sm ml-2">
+                                ({success ? 'Criteria met' : 'Criteria not met'})
+                            </span>
+                        </div>
                     </div>
 
-                    <div className={`p-4 rounded-lg text-center border ${success ? 'bg-green-900/30 border-green-500/50' : 'bg-red-900/30 border-red-500/50'
-                        }`}>
-                        <div className="text-xl font-bold mb-1">
-                            {success ? 'Success!' : 'Failure'}
+                    {/* Stats & Chart */}
+                    <div className="bg-slate-900/50 rounded p-4">
+                        <div className="flex justify-between items-end mb-4">
+                            <div>
+                                <h3 className="text-lg text-slate-200">Probability Convergence</h3>
+                                <div className="text-sm text-slate-400">Attempts: {stats.attempts}</div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-sm text-slate-400">Current P(Success)</div>
+                                <div className="text-2xl font-bold text-blue-400">
+                                    {(stats.attempts > 0 ? (stats.successes / stats.attempts * 100) : 0).toFixed(2)}%
+                                </div>
+                                <div className="text-xs text-green-400">
+                                    Theoretical: {(currentTheoretical * 100).toFixed(2)}%
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-sm opacity-80">
-                            {success
-                                ? `At least one roll was ${target === 'gt4' ? '> 4' : '6'}`
-                                : `No rolls met the criterion ${target === 'gt4' ? '> 4' : '6'}`
-                            }
-                        </div>
+
+                        <button
+                            onClick={() => setShowGraph(!showGraph)}
+                            className="mb-4 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-2 px-4 rounded border border-slate-700 transition-colors flex items-center gap-2"
+                        >
+                            <Activity className="w-3 h-3" />
+                            {showGraph ? 'Hide Convergence Graph' : 'View Convergence Graph'}
+                        </button>
+
+                        {showGraph && (
+                            <div className="h-[300px] w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={history}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                        <XAxis
+                                            dataKey="count"
+                                            stroke="#94a3b8"
+                                            label={{ value: 'Trials', position: 'insideBottom', offset: -5, fill: '#94a3b8' }}
+                                        />
+                                        <YAxis
+                                            domain={[0, 1]}
+                                            stroke="#94a3b8"
+                                            tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }}
+                                            formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'Probability']}
+                                            labelFormatter={(label) => `Trial: ${label}`}
+                                        />
+                                        <Legend />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="simulated"
+                                            stroke="#3b82f6"
+                                            dot={false}
+                                            strokeWidth={2}
+                                            name="Simulated"
+                                            isAnimationActive={false}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="theoretical"
+                                            stroke="#4ade80"
+                                            strokeDasharray="5 5"
+                                            dot={false}
+                                            name="Theoretical"
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
         </div>
     );
 }
+

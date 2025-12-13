@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Play, RotateCcw, Pause, Video } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Play, RotateCcw, Pause, Video, Activity } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export function VideoEncoderSimulation() {
     const [isPlaying, setIsPlaying] = useState(false);
@@ -13,6 +14,8 @@ export function VideoEncoderSimulation() {
     const [totalPackets, setTotalPackets] = useState(0);
     const [recentPackets, setRecentPackets] = useState<number[]>([]);
     const [simulationSpeed, setSimulationSpeed] = useState(20);
+    const [history, setHistory] = useState<Array<{ packets: number; prob: number }>>([]);
+    const [showGraph, setShowGraph] = useState(false);
 
     // Theoretical probabilities
     const theory = {
@@ -31,11 +34,41 @@ export function VideoEncoderSimulation() {
         else if (r < 0.875) length = 300;
         else if (r < 0.9375) length = 400;
 
-        setPacketCounts(prev => ({
-            ...prev,
-            [length]: prev[length] + 1
-        }));
-        setTotalPackets(prev => prev + 1);
+        setPacketCounts(prev => {
+            const next = {
+                ...prev,
+                [length]: prev[length] + 1
+            };
+
+            // Calculate J or K prob: Length >= 300 OR length % 200 == 0
+            // J: >= 300 (300, 400, 500)
+            // K: % 200 == 0 (200, 400)
+            // Union: 200, 300, 400, 500. Only 100 is excluded.
+            // 100 count + union count = total. So P(J u K) = 1 - P(100)
+
+            // Update history sparsely
+            setTotalPackets(t => {
+                const newTotal = t + 1;
+
+                if (newTotal % 10 === 0 || newTotal < 100) {
+                    // Get count of 100s
+                    // c100 not needed directly, just use logic inside prob calculation or simplify
+
+                    const prob100 = next[100] / newTotal;
+                    const probJorK = 1 - prob100;
+
+                    setHistory(h => {
+                        const pt = { packets: newTotal, prob: probJorK };
+                        if (h.length > 200) return [...h.slice(1), pt];
+                        return [...h, pt];
+                    });
+                }
+                return newTotal;
+            });
+
+            return next;
+        });
+
         setRecentPackets(prev => [length, ...prev].slice(0, 20));
     };
 
@@ -52,6 +85,7 @@ export function VideoEncoderSimulation() {
         setPacketCounts({ 100: 0, 200: 0, 300: 0, 400: 0, 500: 0 });
         setTotalPackets(0);
         setRecentPackets([]);
+        setHistory([]);
     };
 
     // Calculate Event Stats
@@ -229,6 +263,51 @@ export function VideoEncoderSimulation() {
                             As n gets larger, the experimental probabilities will converge to the theoretical values (Law of Large Numbers).
                         </p>
                     </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-700/50">
+                        <button
+                            onClick={() => setShowGraph(!showGraph)}
+                            className="mb-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-1 px-3 rounded border border-slate-700 transition-colors flex items-center gap-2"
+                        >
+                            <Activity className="w-3 h-3" />
+                            {showGraph ? 'Hide Convergence Graph (P(J ∪ K))' : 'View Convergence Graph (P(J ∪ K))'}
+                        </button>
+
+                        {showGraph && history.length > 1 && (
+                            <div className="h-40 w-full bg-slate-800/50 rounded">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={history}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                        <XAxis
+                                            dataKey="packets"
+                                            stroke="#94a3b8"
+                                            tick={{ fontSize: 10 }}
+                                        />
+                                        <YAxis
+                                            domain={[0, 1]}
+                                            stroke="#94a3b8"
+                                            tick={{ fontSize: 10 }}
+                                            tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                                        />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
+                                            labelStyle={{ color: '#94a3b8' }}
+                                            formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'P(J ∪ K)']}
+                                        />
+                                        <ReferenceLine y={0.5} stroke="#60a5fa" strokeDasharray="3 3" label={{ value: 'Theory (0.5)', fill: '#60a5fa', fontSize: 10, position: 'insideRight' }} />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="prob"
+                                            stroke="#f472b6"
+                                            dot={false}
+                                            strokeWidth={2}
+                                            isAnimationActive={false}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -238,11 +317,11 @@ export function VideoEncoderSimulation() {
 function StatsRow({ label, current, target, color }: { label: string, current: number, target: number, color: string }) {
     const percent = (current * 100).toFixed(2);
     const targetPercent = (target * 100).toFixed(2);
-    const diff = Math.abs(current - target);
+    // const diff = Math.abs(current - target);
 
-    // Calculate accuracy for color coding
-    const isAccurate = diff < 0.01;
-    const isClose = diff < 0.05;
+    // Calculate accuracy for color coding (unused for now)
+    // const isAccurate = diff < 0.01;
+    // const isClose = diff < 0.05;
 
     return (
         <div className="flex justify-between items-center border-b border-slate-700/50 pb-2 last:border-0">

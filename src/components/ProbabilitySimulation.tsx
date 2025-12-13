@@ -4,14 +4,18 @@ import {
     StopCircle,
     BarChart3,
     RotateCcw,
+    ShieldCheck,
+    ShieldAlert
 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
+// Define the props interface for the component
+// These props control the parameters of the simulation
 interface ProbabilitySimulationProps {
-    totalComputers: number;
-    honeypots: number;
-    victims: number;
-    numAttacks: number;
+    totalComputers: number; // Total number of computers in the network
+    honeypots: number;      // Number of honeypots (traps) in the network
+    victims: number;        // Number of real victim computers (totalComputers - honeypots)
+    numAttacks: number;     // Number of computers the hacker will attack
 }
 
 export function ProbabilitySimulation({
@@ -20,26 +24,37 @@ export function ProbabilitySimulation({
     victims,
     numAttacks,
 }: ProbabilitySimulationProps) {
+    // State to track the number of simulations to run (user configurable)
     const [numSimulations, setNumSimulations] = useState(1000);
+    // State to track if the simulation is currently running
     const [isRunning, setIsRunning] = useState(false);
+    // State for the simulation speed (visual delay between batches)
     const [simulationSpeed, setSimulationSpeed] = useState(100);
+    // Ref to access the latest speed value inside the async loop layout closures
     const speedRef = React.useRef(simulationSpeed);
 
+    // Keep the speed ref in sync with the state
     useEffect(() => {
         speedRef.current = simulationSpeed;
     }, [simulationSpeed]);
+
+    // State to store the final results of the simulation run
     const [results, setResults] = useState<{
         total: number;
         caught: number;
-        hackerWins: number;
-        inconclusive: number;
+        missed: number; // Replaced hackerWins/inconclusive with simple Missed (Safe)
         probability: number;
     } | null>(null);
+
+    // State to store data for the convergence graph (showing how probability stabilizes over time)
     const [convergenceData, setConvergenceData] = useState<Array<{ simulations: number; probability: number }>>([]);
+    // State to store the theoretically calculated probability for comparison
     const [theoreticalProb, setTheoreticalProb] = useState<number | null>(null);
 
     // Calculate theoretical probability using simplified combinatorics
+    // This effect runs whenever the simulation parameters change
     useEffect(() => {
+        // Helper function to calculate binomial coefficients (n choose k)
         const binomial = (n: number, k: number): number => {
             if (k > n || k < 0) return 0;
             if (k === 0 || k === n) return 1;
@@ -51,9 +66,13 @@ export function ProbabilitySimulation({
             return Math.round(result);
         };
 
+        // Determine which positions are checked. 
+        // In this simulation logic, it seems we check specific fixed positions (0, 2, 4...) 
+        // effectively simulating a patterned attack or sampling.
         const checkPositions = Array.from({ length: numAttacks }, (_, i) => i * 2);
         const numCheckPositions = checkPositions.length;
 
+        // If too many positions to check, combinatorial calculation becomes too heavy, so skip it.
         if (numCheckPositions > 25) {
             setTheoreticalProb(null);
             return;
@@ -62,6 +81,9 @@ export function ProbabilitySimulation({
         const totalPermutations = binomial(totalComputers, honeypots);
         let caughtPermutations = 0;
 
+        // Iterate through all possible subsets of checked positions (using a bitmask)
+        // to determine if a honeypot would be found.
+        // This effectively uses the Principle of Inclusion-Exclusion logic or exhaustive counting
         for (let mask = 1; mask < (1 << numCheckPositions); mask++) {
             let honeypotsAtPositions = 0;
             for (let i = 0; i < numCheckPositions; i++) {
@@ -76,6 +98,8 @@ export function ProbabilitySimulation({
             const remainingPositions = totalComputers - honeypotsAtPositions;
             const ways = binomial(remainingPositions, remainingHoneypots);
 
+            // Add or subtract based on the number of bits set (Inclusion-Exclusion)
+            // Note: This logic seems specific to a particular probability problem formulation.
             if (honeypotsAtPositions % 2 === 1) {
                 caughtPermutations += ways;
             } else {
@@ -86,85 +110,92 @@ export function ProbabilitySimulation({
         setTheoreticalProb(caughtPermutations / totalPermutations);
     }, [totalComputers, honeypots, numAttacks]);
 
+    // Main function to run the Monte Carlo simulation
     const runSimulation = async () => {
         setIsRunning(true);
         setResults(null);
-        setConvergenceData([]);
+        setConvergenceData([{ simulations: 0, probability: 0 }]);
 
+        // Define which positions (indexes) the attacker checks (e.g., 0, 2, 4...)
         const checkPositions = Array.from({ length: numAttacks }, (_, i) => i * 2);
         let caughtCount = 0;
-        let hackerWinsCount = 0;
-        let inconclusiveCount = 0;
+        let missedCount = 0;
 
+        // We run simulations in batches to avoid blocking the UI thread and to allow for animation
         const batchSize = 1000;
         const totalBatches = Math.ceil(numSimulations / batchSize);
-        const dataPoints: Array<{ simulations: number; probability: number }> = [];
+        const dataPoints: Array<{ simulations: number; probability: number }> = [{ simulations: 0, probability: 0 }];
 
+        // Calculate correct number of victims to ensure N is consistent
+        const safeComputers = Math.max(0, totalComputers - honeypots);
+
+        // Loop through all batches
         for (let batch = 0; batch < totalBatches; batch++) {
             const batchStart = batch * batchSize;
             const batchEnd = Math.min((batch + 1) * batchSize, numSimulations);
 
-            // Run batch synchronously
+            // Run iterations for the current batch synchronously
             for (let sim = batchStart; sim < batchEnd; sim++) {
+                // Construct the network array: H for honeypot, V for victim (safe)
                 const computers = [
                     ...Array(honeypots).fill("H"),
-                    ...Array(victims).fill("V"),
+                    ...Array(safeComputers).fill("V"),
                 ];
 
-                // Fisher-Yates shuffle
+                // Fisher-Yates shuffle algorithm to randomize the positions of Honeypots and Victims
                 for (let i = computers.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [computers[i], computers[j]] = [computers[j], computers[i]];
                 }
 
                 let caught = false;
-                let hackerWins = false;
 
+                // Check if any of the attacked positions contain a honeypot.
+                // If even one honeypot is hit, the attack is considered DETECTED.
                 for (let i = 0; i < checkPositions.length; i++) {
                     const pos = checkPositions[i];
-                    if (computers[pos] === "H") {
+                    // Check if we hit a honeypot at this position (bounds check included)
+                    if (pos < computers.length && computers[pos] === "H") {
                         caught = true;
-                        break;
-                    }
-                    if (computers[pos] === "V" && computers[pos + 1] === "H") {
-                        hackerWins = true;
-                        break;
+                        break; // Stop checking further, as one detection is enough
                     }
                 }
 
+                // Increment the counter based on the outcome
                 if (caught) {
                     caughtCount++;
-                } else if (hackerWins) {
-                    hackerWinsCount++;
                 } else {
-                    inconclusiveCount++;
+                    missedCount++;
                 }
             }
 
-            // Update convergence data every batch
+            // Update convergence data after every batch
             const currentSim = batchEnd;
             dataPoints.push({
                 simulations: currentSim,
                 probability: caughtCount / currentSim,
             });
 
+            // Update state to trigger a re-render of the graph
             setConvergenceData([...dataPoints]);
 
-            // Allow UI to update, controlled by speed
-            const delay = Math.max(0, 100 - speedRef.current); // speedRef.current is 1-100, so 100-100=0 delay, 100-1=99 delay
+            // Introduce a delay to allow the UI to update, controlled by the speed slider
+            // Higher speed = lower delay
+            const delay = Math.max(0, 100 - speedRef.current);
             await new Promise(resolve => setTimeout(resolve, delay));
         }
 
+        // Finalize results after all batches are complete
         setResults({
             total: numSimulations,
             caught: caughtCount,
-            hackerWins: hackerWinsCount,
-            inconclusive: inconclusiveCount,
+            missed: missedCount,
             probability: caughtCount / numSimulations,
         });
         setIsRunning(false);
     };
 
+    // Custom tooltip for the Recharts graph
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
             return (
@@ -185,6 +216,7 @@ export function ProbabilitySimulation({
             </h2>
 
             <div className="space-y-4">
+                {/* Simulation Control Panel */}
                 <div className="bg-slate-900/50 rounded p-4">
                     <label className="block text-sm text-slate-400 mb-2">
                         Number of Simulations
@@ -220,7 +252,7 @@ export function ProbabilitySimulation({
                     </div>
                 </div>
 
-                {/* Speed Control */}
+                {/* Speed Control UI */}
                 <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded mb-6">
                     <span className="text-xs text-slate-400 w-12">Speed</span>
                     <input
@@ -235,6 +267,7 @@ export function ProbabilitySimulation({
                     <span className="text-xs text-slate-400 w-8 text-right">{simulationSpeed}%</span>
                 </div>
 
+                {/* Action Buttons */}
                 <div className="flex gap-2">
                     <button
                         onClick={runSimulation}
@@ -267,6 +300,7 @@ export function ProbabilitySimulation({
                     </button>
                 </div>
 
+                {/* Convergence Graph - Displays while running and after */}
                 {convergenceData.length > 0 && (
                     <div className="bg-slate-900/50 rounded-lg p-4">
                         <h3 className="text-sm text-slate-400 mb-3">Probability Convergence</h3>
@@ -313,38 +347,40 @@ export function ProbabilitySimulation({
                     </div>
                 )}
 
+                {/* Simulation Final Results - Displays after completion */}
                 {results && (
                     <div className="bg-slate-900/50 p-4 rounded border border-slate-700">
                         <h3 className="text-xs font-semibold text-slate-400 uppercase mb-3 flex items-center gap-2">
                             <BarChart3 className="w-4 h-4" />
                             Simulation Outcomes
                         </h3>
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-3 text-center">
-                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Detection (Catch)</div>
-                                <div className="text-xl font-bold text-yellow-500">{results.caught.toLocaleString()}</div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Attack Detected Stats */}
+                            <div className="bg-yellow-900/20 border border-yellow-500/30 rounded p-4 text-center">
+                                <div className="flex justify-center mb-2">
+                                    <ShieldCheck className="w-6 h-6 text-yellow-500" />
+                                </div>
+                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Attack Detected</div>
+                                <div className="text-2xl font-bold text-yellow-500">{results.caught.toLocaleString()}</div>
                                 <div className="text-xs text-yellow-500/70 mt-1">
                                     {((results.caught / results.total) * 100).toFixed(2)}%
                                 </div>
                             </div>
 
-                            <div className="bg-purple-900/20 border border-purple-500/30 rounded p-3 text-center">
-                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Hacker Win</div>
-                                <div className="text-xl font-bold text-purple-500">{results.hackerWins.toLocaleString()}</div>
-                                <div className="text-xs text-purple-500/70 mt-1">
-                                    {((results.hackerWins / results.total) * 100).toFixed(2)}%
+                            {/* Attack Missed Stats */}
+                            <div className="bg-slate-800/50 border border-slate-600 rounded p-4 text-center">
+                                <div className="flex justify-center mb-2">
+                                    <ShieldAlert className="w-6 h-6 text-slate-400" />
                                 </div>
-                            </div>
-
-                            <div className="bg-slate-800/50 border border-slate-600 rounded p-3 text-center">
-                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Inconclusive</div>
-                                <div className="text-xl font-bold text-slate-400">{results.inconclusive.toLocaleString()}</div>
+                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">Attack Missed</div>
+                                <div className="text-2xl font-bold text-slate-400">{results.missed.toLocaleString()}</div>
                                 <div className="text-xs text-slate-500 mt-1">
-                                    {((results.inconclusive / results.total) * 100).toFixed(2)}%
+                                    {((results.missed / results.total) * 100).toFixed(2)}%
                                 </div>
                             </div>
                         </div>
 
+                        {/* Calculated Probability Display */}
                         <div className="mt-3 pt-3 border-t border-slate-700/50">
                             <div className="flex justify-between items-center bg-gradient-to-r from-blue-900/20 to-green-900/20 rounded p-3 border border-blue-500/30">
                                 <div>
@@ -366,6 +402,7 @@ export function ProbabilitySimulation({
                     </div>
                 )}
 
+                {/* Initial State Message */}
                 {!results && !isRunning && (
                     <div className="text-center text-slate-500 py-8">
                         Click "Run Simulation" to verify the probability calculation

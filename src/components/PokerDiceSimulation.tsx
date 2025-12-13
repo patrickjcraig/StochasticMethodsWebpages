@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { PlayCircle, StopCircle, BarChart3, RotateCcw } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { PlayCircle, StopCircle, LineChart as LineChartIcon, RotateCcw, Activity } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface PokerDiceSimulationProps {
   numDice: number;
@@ -10,6 +10,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
   const [numSimulations, setNumSimulations] = useState(100000);
   const [isRunning, setIsRunning] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(100); // 0-100 (100 is max speed)
+  const [showGraph, setShowGraph] = useState(false);
   const speedRef = React.useRef(simulationSpeed);
 
   useEffect(() => {
@@ -21,6 +22,8 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
     counts: { [key: string]: number };
     probabilities: { [key: string]: number };
   } | null>(null);
+
+  const [history, setHistory] = useState<Array<any>>([]);
 
   const expectedValues: { [key: string]: number } = {
     'No Two Alike': 0.0926,
@@ -49,6 +52,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
   const runSimulation = async () => {
     setIsRunning(true);
     setResults(null);
+    setHistory([]);
 
     const counts: { [key: string]: number } = {
       'No Two Alike': 0,
@@ -64,6 +68,8 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
     const totalBatches = Math.ceil(numSimulations / batchSize);
 
     for (let batch = 0; batch < totalBatches; batch++) {
+      if (!speedRef.current && speedRef.current !== 0) break; // Safety check if component unmounts logic needed, but mostly ref is fine
+
       const batchStart = batch * batchSize;
       const batchEnd = Math.min((batch + 1) * batchSize, numSimulations);
 
@@ -78,11 +84,18 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
         currentProbabilities[key] = counts[key] / batchEnd;
       });
 
+      const newHistoryPoint = {
+        iteration: batchEnd,
+        ...currentProbabilities
+      };
+
       setResults({
         total: batchEnd,
         counts: { ...counts },
         probabilities: currentProbabilities
       });
+
+      setHistory(prev => [...prev, newHistoryPoint]);
 
       // Allow UI to update and throttle based on speed
       // Speed 100 -> 0ms delay. Speed 1 -> 100ms delay.
@@ -94,7 +107,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
   };
 
 
-  const getBarColor = (handType: string) => {
+  const getLineColor = (handType: string) => {
     const colors: { [key: string]: string } = {
       'No Two Alike': '#3b82f6',
       'One Pair': '#10b981',
@@ -107,23 +120,6 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
     return colors[handType] || '#64748b';
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-purple-900 border border-purple-600 rounded p-3 text-sm">
-          <p className="text-purple-200 mb-1">{data.hand}</p>
-          <p className="text-white">Simulated: {(data.simulated * 100).toFixed(2)}%</p>
-          <p className="text-blue-300">Expected: {(data.expected * 100).toFixed(2)}%</p>
-          <p className="text-purple-300">
-            Count: {data.count?.toLocaleString()}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   const handOrder = [
     'No Two Alike',
     'One Pair',
@@ -134,20 +130,10 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
     'Five Alike'
   ];
 
-  const chartData = results
-    ? handOrder.map(hand => ({
-      hand: hand.replace(' ', '\n'),
-      simulated: results.probabilities[hand],
-      expected: expectedValues[hand],
-      count: results.counts[hand],
-      color: getBarColor(hand)
-    }))
-    : [];
-
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
       <h2 className="text-xl mb-4 flex items-center gap-2">
-        <BarChart3 className="w-5 h-5" />
+        <LineChartIcon className="w-5 h-5" />
         Monte Carlo Simulation
       </h2>
 
@@ -221,7 +207,10 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
             )}
           </button>
           <button
-            onClick={() => setResults(null)}
+            onClick={() => {
+              setResults(null);
+              setHistory([]);
+            }}
             disabled={isRunning || !results}
             className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 rounded-lg transition-colors"
             title="Reset Results"
@@ -238,32 +227,60 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
             </div>
 
             <div className="bg-slate-900/50 rounded-lg p-4">
-              <h3 className="text-sm text-slate-300 mb-3">Probability Comparison</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#4c1d95" />
-                  <XAxis
-                    dataKey="hand"
-                    stroke="#c4b5fd"
-                    tick={{ fill: '#c4b5fd', fontSize: 10 }}
-                    interval={0}
-                  />
-                  <YAxis
-                    stroke="#c4b5fd"
-                    tick={{ fill: '#c4b5fd', fontSize: 12 }}
-                    tickFormatter={(value) => `${(value * 100).toFixed(0)}%`}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="simulated" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="text-xs text-slate-400 mt-2">
-                Bars show simulated probabilities. Hover for expected values.
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm text-slate-300">Probability Convergence</h3>
+                <button
+                  onClick={() => setShowGraph(!showGraph)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-1 px-3 rounded border border-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Activity className="w-3 h-3" />
+                  {showGraph ? 'Hide Graph' : 'View Graph'}
+                </button>
               </div>
+
+              {showGraph && (
+                <>
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={history}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#4c1d95" />
+                        <XAxis
+                          dataKey="iteration"
+                          stroke="#c4b5fd"
+                          tick={{ fill: '#c4b5fd', fontSize: 10 }}
+                          tickFormatter={(val) => val.toLocaleString()}
+                          label={{ value: 'Iterations', position: 'insideBottom', offset: -5, fill: '#c4b5fd' }}
+                        />
+                        <YAxis
+                          stroke="#c4b5fd"
+                          tick={{ fill: '#c4b5fd', fontSize: 12 }}
+                          tickFormatter={(value) => value.toFixed(2)}
+                          domain={[0, 0.6]} // Adjusted to focus on meaningful range (max pair is ~0.46)
+                        />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e1b4b', borderColor: '#4c1d95', color: '#fff' }}
+                          formatter={(val: number) => val.toFixed(4)}
+                          labelFormatter={(label) => `Iteration: ${label}`}
+                        />
+                        <Legend />
+                        {handOrder.map(hand => (
+                          <Line
+                            key={hand}
+                            type="monotone"
+                            dataKey={hand}
+                            stroke={getLineColor(hand)}
+                            dot={false}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-2">
+                    Lines show how experimental probability converges to theoretical values over time.
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -272,7 +289,7 @@ export function PokerDiceSimulation({ numDice }: PokerDiceSimulationProps) {
                 return (
                   <div key={hand} className="bg-slate-900/30 rounded p-3 border border-slate-700/50">
                     <div className="flex justify-between items-center mb-1">
-                      <div className="text-sm text-slate-200">{hand}</div>
+                      <div className="text-sm text-slate-200" style={{ color: getLineColor(hand) }}>{hand}</div>
                       <div className="text-xs text-slate-400">
                         {results.counts[hand].toLocaleString()} rolls
                       </div>

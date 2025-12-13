@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Play, RotateCcw, DollarSign, Trophy } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Play, RotateCcw, Trophy, Activity } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function PowerballSimulation() {
     const [userWhite, setUserWhite] = useState<number[]>([]);
@@ -14,6 +15,8 @@ export function PowerballSimulation() {
         winnings: 0,
         cost: 0
     });
+    const [history, setHistory] = useState<Array<{ played: number; roi: number }>>([]);
+    const [showGraph, setShowGraph] = useState(false);
 
     const quickPick = () => {
         const white: number[] = [];
@@ -27,6 +30,7 @@ export function PowerballSimulation() {
         setResult(null);
         setDrawWhite([]);
         setDrawPower(null);
+        setHistory([]); // Reset history on new numbers (optional, but cleaner)
     };
 
     const draw = () => {
@@ -60,11 +64,27 @@ export function PowerballSimulation() {
             else if (powerMatch) { prize = 4; text = '$4'; }
 
             setResult(text);
-            setStats(prev => ({
-                played: prev.played + 1,
-                winnings: prev.winnings + prize,
-                cost: prev.cost + 2
-            }));
+            setStats(prev => {
+                const newStats = {
+                    played: prev.played + 1,
+                    winnings: prev.winnings + prize,
+                    cost: prev.cost + 2
+                };
+
+                // Update history every 10 draws or so to keep performance needed? 
+                // Let's do every one for now but limit array size if needed.
+                // Or maybe just every 10 to avoid too much re-render
+                if (newStats.played % 10 === 0 || newStats.played < 100) {
+                    setHistory(h => {
+                        const newRoi = ((newStats.winnings - newStats.cost) / newStats.cost);
+                        const newPoint = { played: newStats.played, roi: newRoi };
+                        // Keep last 200 points for sliding window effect
+                        if (h.length > 200) return [...h.slice(1), newPoint];
+                        return [...h, newPoint];
+                    });
+                }
+                return newStats;
+            });
         }
     };
 
@@ -217,12 +237,59 @@ export function PowerballSimulation() {
                         </div>
 
                         <button
-                            onClick={() => setStats({ played: 0, winnings: 0, cost: 0 })}
+                            onClick={() => {
+                                setStats({ played: 0, winnings: 0, cost: 0 });
+                                setHistory([]);
+                            }}
                             className="mt-4 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
                         >
                             <RotateCcw className="w-3 h-3" />
                             Reset Stats
                         </button>
+
+                        <div className="mt-6 pt-4 border-t border-slate-700/50">
+                            <button
+                                onClick={() => setShowGraph(!showGraph)}
+                                className="mb-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-1 px-3 rounded border border-slate-700 transition-colors flex items-center gap-2"
+                            >
+                                <Activity className="w-3 h-3" />
+                                {showGraph ? 'Hide ROI Graph' : 'View ROI Graph'}
+                            </button>
+
+                            {showGraph && history.length > 1 && (
+                                <div className="h-40 w-full bg-slate-800/50 rounded">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={history}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                            <XAxis
+                                                dataKey="played"
+                                                stroke="#94a3b8"
+                                                tick={{ fontSize: 10 }}
+                                                tickFormatter={(val) => val > 1000 ? `${(val / 1000).toFixed(0)}k` : val}
+                                            />
+                                            <YAxis
+                                                stroke="#94a3b8"
+                                                tick={{ fontSize: 10 }}
+                                                tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
+                                                labelStyle={{ color: '#94a3b8' }}
+                                                formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'ROI']}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="roi"
+                                                stroke="#f87171"
+                                                dot={false}
+                                                strokeWidth={2}
+                                                isAnimationActive={false}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

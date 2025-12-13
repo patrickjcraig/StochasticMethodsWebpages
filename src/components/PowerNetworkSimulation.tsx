@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Pause, Zap } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { useState, useEffect, useCallback } from 'react';
+import { Play, RotateCcw, Pause, Zap, Activity, Plus, GripVertical } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 
 interface PowerNetworkSimulationProps {
     pL1: number;
@@ -13,87 +14,124 @@ interface PowerNetworkSimulationProps {
     theoreticalProb: number;
 }
 
-const LineViz = ({ status, label, compact }: { status: boolean | undefined, label: string, compact?: boolean }) => (
-    <div className={`
-    relative flex items-center justify-center border-2 rounded-lg transition-colors duration-200
-    ${status === undefined ? 'border-slate-700 bg-slate-800' :
-            status ? 'border-green-500 bg-green-900/30' : 'border-red-500 bg-red-900/30'}
-    ${compact ? 'w-10 h-8 text-xs' : 'w-12 h-12 text-sm'}
-  `}>
-        <span className={`font-bold ${status ? 'text-green-400' : status === false ? 'text-red-400' : 'text-slate-500'}`}>
-            {label}
-        </span>
-    </div>
-);
+// Data Structures for RBD (Reliability Block Diagram)
+interface LinkItem {
+    id: string;
+    label: string;
+    probKey: string;
+}
 
-export function PowerNetworkSimulation({
-    pL1, pL2, pL3, pL4, pL6,
-    pL5GivenL6, pL5GivenNotL6,
-    theoreticalProb
-}: PowerNetworkSimulationProps) {
+interface PathColumn {
+    id: string;
+    title: string;
+    linkIds: string[];
+}
+
+const ALL_LINKS: LinkItem[] = [
+    { id: 'l1', label: 'L1', probKey: 'pL1' },
+    { id: 'l2', label: 'L2', probKey: 'pL2' },
+    { id: 'l3', label: 'L3', probKey: 'pL3' },
+    { id: 'l4', label: 'L4', probKey: 'pL4' },
+    { id: 'l5', label: 'L5', probKey: 'pL5' },
+    { id: 'l6', label: 'L6', probKey: 'pL6' },
+];
+
+const INITIAL_PATHS: { [key: string]: PathColumn } = {
+    'path-1': { id: 'path-1', title: 'Top Path', linkIds: ['l1', 'l3'] },
+    'path-2': { id: 'path-2', title: 'Bottom Path', linkIds: ['l4', 'l6'] },
+    'unused': { id: 'unused', title: 'Spare Components', linkIds: ['l2', 'l5'] },
+};
+
+export function PowerNetworkSimulation(props: PowerNetworkSimulationProps) {
+    const [paths, setPaths] = useState(INITIAL_PATHS);
+    const [pathOrder, setPathOrder] = useState(['path-1', 'path-2', 'unused']);
+
+    // React 18 Strict Mode Fix for RBD
+    // react-beautiful-dnd requires animation frame enablement in Strict Mode
+    const [enabled, setEnabled] = useState(false);
+    useEffect(() => {
+        const animation = requestAnimationFrame(() => setEnabled(true));
+        return () => {
+            cancelAnimationFrame(animation);
+            setEnabled(false);
+        };
+    }, []);
+
+    // Simulation State
     const [isPlaying, setIsPlaying] = useState(false);
     const [simulationCount, setSimulationCount] = useState(0);
     const [successCount, setSuccessCount] = useState(0);
-    const [currentStatus, setCurrentStatus] = useState<{ [key: string]: boolean } | null>(null);
-    const [convergenceData, setConvergenceData] = useState<Array<{ simulations: number; probability: number }>>([]);
     const [simulationSpeed, setSimulationSpeed] = useState(20);
+    const [convergenceData, setConvergenceData] = useState<Array<{ simulations: number; probability: number }>>([]);
+    const [currentStatus, setCurrentStatus] = useState<{ [key: string]: boolean } | null>(null);
+    const [showGraph, setShowGraph] = useState(false);
 
-    // Reset when props change
-    useEffect(() => {
-        reset();
-    }, [pL1, pL2, pL3, pL4, pL6, pL5GivenL6, pL5GivenNotL6]);
+    // --- Simulation Logic (Series-Parallel) ---
+    const runStep = useCallback(() => {
+        // 1. Determine status of all links
+        const linkStatus: { [key: string]: boolean } = {};
 
-    const runStep = () => {
-        // Determine status of each line
-        const l1 = Math.random() < pL1;
-        const l2 = Math.random() < pL2;
-        const l3 = Math.random() < pL3;
-        const l4 = Math.random() < pL4;
-        const l6 = Math.random() < pL6;
+        // Correlated: L5 and L6
+        const l6Active = Math.random() < props.pL6;
+        const pL5 = l6Active ? props.pL5GivenL6 : props.pL5GivenNotL6;
+        const l5Active = Math.random() < pL5;
 
-        // L5 depends on L6
-        const pL5 = l6 ? pL5GivenL6 : pL5GivenNotL6;
-        const l5 = Math.random() < pL5;
+        ALL_LINKS.forEach(link => {
+            if (link.id === 'l6') linkStatus[link.id] = l6Active;
+            else if (link.id === 'l5') linkStatus[link.id] = l5Active;
+            else {
+                // @ts-ignore
+                const prob = props[link.probKey] || 0.5;
+                linkStatus[link.id] = Math.random() < prob;
+            }
+        });
 
-        // Check paths
-        // Path 1: (L1 || L2) && L3
-        const path1 = (l1 || l2) && l3;
+        // 2. Check Paths (Series Logic: All must be true)
+        let systemSuccess = false;
 
-        // Path 2: L4 && (L5 || L6)
-        const path2 = l4 && (l5 || l6);
+        // We only consider "Active Paths" (not unused)
+        const activePathIds = pathOrder.filter(id => id !== 'unused');
 
-        const success = path1 || path2;
+        const pathSuccesses: { [key: string]: boolean } = {};
+
+        activePathIds.forEach(pathId => {
+            const path = paths[pathId];
+            if (path.linkIds.length === 0) return; // Empty path doesn't conduct
+
+            const pathWorks = path.linkIds.every(lid => linkStatus[lid]);
+            pathSuccesses[pathId] = pathWorks;
+            if (pathWorks) systemSuccess = true;
+        });
+
+        // Update State
+        setCurrentStatus({ ...linkStatus, success: systemSuccess, ...pathSuccesses });
 
         setSimulationCount(prev => {
             const newCount = prev + 1;
-            const newSuccess = successCount + (success ? 1 : 0);
+            const newSuccess = successCount + (systemSuccess ? 1 : 0);
             setSuccessCount(newSuccess);
 
-            // Update convergence data every 10 samples approx, or less frequently for performance
             if (newCount % 10 === 0 || newCount < 100) {
                 setConvergenceData(prevData => {
                     const newData = [...prevData, { simulations: newCount, probability: newSuccess / newCount }];
-                    // Keep array size manageable
                     if (newData.length > 100) return newData.slice(-100);
                     return newData;
                 });
             }
             return newCount;
         });
-
-        setCurrentStatus({ l1, l2, l3, l4, l5, l6, success });
-    };
+    }, [paths, pathOrder, props, successCount]);
 
     useEffect(() => {
         let interval: number;
         if (isPlaying) {
-            // Run multiple steps per interval for speed
             interval = window.setInterval(() => {
-                for (let i = 0; i < 10; i++) runStep();
-            }, 1000 / simulationSpeed);
+                runStep();
+                if (simulationSpeed > 20) for (let i = 0; i < 4; i++) runStep();
+            }, 1000 / Math.min(60, simulationSpeed));
         }
         return () => clearInterval(interval);
-    }, [isPlaying, successCount, simulationSpeed]); // dependence on successCount is indirect via runStep closure if not careful, but setState uses functional update
+    }, [isPlaying, runStep, simulationSpeed]);
 
     const reset = () => {
         setIsPlaying(false);
@@ -103,23 +141,145 @@ export function PowerNetworkSimulation({
         setConvergenceData([]);
     };
 
+    const onDragEnd = (result: DropResult) => {
+        const { destination, source, draggableId } = result;
+
+        if (!destination) return;
+        if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+        const startPath = paths[source.droppableId];
+        const finishPath = paths[destination.droppableId];
+
+        // Moving within same list
+        if (startPath === finishPath) {
+            const newLinkIds = Array.from(startPath.linkIds);
+            newLinkIds.splice(source.index, 1);
+            newLinkIds.splice(destination.index, 0, draggableId);
+            const newPath = { ...startPath, linkIds: newLinkIds };
+            setPaths({ ...paths, [newPath.id]: newPath });
+            return;
+        }
+
+        // Moving to different list
+        const startLinkIds = Array.from(startPath.linkIds);
+        startLinkIds.splice(source.index, 1);
+        const newStart = { ...startPath, linkIds: startLinkIds };
+
+        const finishLinkIds = Array.from(finishPath.linkIds);
+        finishLinkIds.splice(destination.index, 0, draggableId);
+        const newFinish = { ...finishPath, linkIds: finishLinkIds };
+
+        setPaths({ ...paths, [newStart.id]: newStart, [newFinish.id]: newFinish });
+    };
+
+    const addPath = () => {
+        const newId = `path-${Date.now()}`;
+        setPaths(prev => ({ ...prev, [newId]: { id: newId, title: 'New Path', linkIds: [] } }));
+        setPathOrder(prev => {
+            const newOrder = [...prev];
+            // Insert before 'unused'
+            newOrder.splice(newOrder.length - 1, 0, newId);
+            return newOrder;
+        });
+    };
+
     const experimentalProb = simulationCount > 0 ? successCount / simulationCount : 0;
+
+    if (!enabled) return null; // Wait for clean render pass
 
     return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mt-8">
             <h2 className="text-xl mb-4 flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-400" />
-                Power Network Simulation
+                Power Network Builder & Simulation
             </h2>
 
+            <p className="text-slate-400 text-sm mb-6">
+                Drag links to configure the network. Power flows if <strong>any</strong> connected path has <strong>all</strong> its components working (Reliability Block Diagram).
+            </p>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Editor Column */}
+                <div className="flex flex-col gap-4">
+                    <DragDropContext onDragEnd={onDragEnd}>
+                        {pathOrder.map(pathId => {
+                            const path = paths[pathId];
+                            const isUnused = pathId === 'unused';
+                            const isPathActive = currentStatus && currentStatus[pathId];
+
+                            return (
+                                <div key={path.id} className={`rounded-lg p-4 transition-colors ${isUnused ? 'bg-slate-900/30 border border-dashed border-slate-700' :
+                                    'bg-slate-900 border border-slate-700'
+                                    } ${isPathActive ? 'shadow-[0_0_15px_rgba(250,204,21,0.2)] border-yellow-500/50' : ''}`}>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className={`text-sm font-semibold uppercase tracking-wider ${isUnused ? 'text-slate-500' : 'text-slate-300'}`}>
+                                            {path.title}
+                                            {isPathActive && <span className="ml-2 text-yellow-400 text-[10px] animate-pulse">⚡ CONDUCTING</span>}
+                                        </h3>
+                                    </div>
+
+                                    <Droppable droppableId={path.id} direction="horizontal">
+                                        {(provided, snapshot) => (
+                                            <div
+                                                ref={provided.innerRef}
+                                                {...provided.droppableProps}
+                                                className={`flex flex-wrap gap-2 min-h-[60px] p-2 rounded transition-colors ${snapshot.isDraggingOver ? 'bg-slate-800/80' : 'bg-slate-950/50'}`}
+                                            >
+                                                {path.linkIds.map((linkId, index) => {
+                                                    const link = ALL_LINKS.find(l => l.id === linkId)!;
+                                                    const isActive = currentStatus ? currentStatus[linkId] : true;
+                                                    // While active simulation: use status.
+                                                    const statusColor = currentStatus
+                                                        ? (isActive ? 'bg-green-600' : 'bg-red-900/50 opacity-50')
+                                                        : 'bg-blue-600';
+
+                                                    return (
+                                                        <Draggable key={linkId} draggableId={linkId} index={index}>
+                                                            {(provided, snapshot) => (
+                                                                <div
+                                                                    ref={provided.innerRef}
+                                                                    {...provided.draggableProps}
+                                                                    {...provided.dragHandleProps}
+                                                                    className={`
+                                                                        flex items-center gap-2 px-3 py-2 rounded shadow-sm text-sm font-bold text-white select-none
+                                                                        ${statusColor}
+                                                                        ${snapshot.isDragging ? 'scale-110 shadow-xl ring-2 ring-white/20' : ''}
+                                                                    `}
+                                                                    style={provided.draggableProps.style}
+                                                                >
+                                                                    <GripVertical className="w-3 h-3 opacity-50" />
+                                                                    {link.label}
+                                                                </div>
+                                                            )}
+                                                        </Draggable>
+                                                    );
+                                                })}
+                                                {provided.placeholder}
+                                                {path.linkIds.length === 0 && (
+                                                    <div className="text-xs text-slate-600 self-center w-full text-center italic">
+                                                        Drop links here
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </Droppable>
+                                </div>
+                            );
+                        })}
+                    </DragDropContext>
+
+                    <button onClick={addPath} className="flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-700 rounded-lg text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors">
+                        <Plus className="w-4 h-4" /> Add Parallel Path
+                    </button>
+                </div>
+
+                {/* Controls & Stats Column */}
                 <div>
                     <div className="grid grid-cols-2 gap-3 mb-6">
                         <div className="flex flex-col gap-2 col-span-2 sm:col-span-1">
                             <button
                                 onClick={() => setIsPlaying(!isPlaying)}
-                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors w-full ${isPlaying ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'
-                                    }`}
+                                className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors w-full ${isPlaying ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}
                             >
                                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                                 {isPlaying ? 'Pause' : 'Start'}
@@ -132,161 +292,68 @@ export function PowerNetworkSimulation({
                                 Reset
                             </button>
                         </div>
-
                         <div className="flex flex-col justify-center col-span-2 sm:col-span-1 bg-slate-900/50 p-2 rounded">
                             <label className="text-xs text-slate-400 flex justify-between mb-1">
-                                <span>Speed</span>
-                                <span>{simulationSpeed}x</span>
+                                <span>Speed</span> <span>{simulationSpeed}x</span>
                             </label>
                             <input
-                                type="range"
-                                min="1"
-                                max="100"
-                                value={simulationSpeed}
+                                type="range" min="1" max="100" value={simulationSpeed}
                                 onChange={(e) => setSimulationSpeed(Number(e.target.value))}
                                 className="w-full accent-blue-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
                             />
                         </div>
-
                         <div className="col-span-2 flex items-center bg-slate-900/50 px-3 py-1 rounded text-sm text-slate-400 justify-between">
-                            <span>Runs:</span>
-                            <span className="text-white font-mono">{simulationCount.toLocaleString()}</span>
+                            <span>Runs:</span> <span className="text-white font-mono">{simulationCount.toLocaleString()}</span>
                         </div>
                     </div>
 
-                    {/* Network Visualization */}
-                    <div className="bg-slate-900/50 rounded-lg p-4 relative flex flex-col items-center justify-center min-h-[300px]">
-
-                        <div className="absolute top-2 right-2 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs">
-                            <div className={`${currentStatus?.success ? 'text-green-400 font-bold' : 'text-slate-500'}`}>
-                                {currentStatus?.success ? '⚡ POWER ON' : '🔴 NO POWER'}
+                    <div className="bg-slate-900/50 rounded-lg p-6 border border-slate-700">
+                        <div className={`text-center py-4 mb-6 rounded-lg border-2 transition-all ${currentStatus?.success
+                            ? 'bg-gradient-to-r from-yellow-900/40 to-amber-900/40 border-yellow-500 text-yellow-400 shadow-lg'
+                            : 'bg-slate-800 border-slate-700 text-slate-500'
+                            }`}>
+                            <div className="text-sm uppercase tracking-widest font-bold mb-1">System Status</div>
+                            <div className="text-2xl font-black flex items-center justify-center gap-2">
+                                {currentStatus?.success ? <Zap className="fill-current" /> : null}
+                                {currentStatus?.success ? 'POWER DELIVERED' : 'OFFLINE'}
                             </div>
                         </div>
 
-                        <svg viewBox="0 0 600 300" className="w-full h-full text-slate-300">
-                            <defs>
-                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
-                                </marker>
-                            </defs>
-
-                            {/* Source and Dest text */}
-                            <text x="30" y="155" fill="#60a5fa" fontSize="12" fontWeight="bold">SOURCE</text>
-                            <text x="530" y="155" fill="#fbbf24" fontSize="12" fontWeight="bold">DEST</text>
-
-                            {/* Main Paths */}
-                            {/* Path 1 Top: Split -> (L1 || L2) -> Join -> L3 -> Dest */}
-                            <path d="M 80 150 C 100 150, 100 80, 150 80" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 80 150 C 100 150, 100 220, 150 220" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* Top Branch (L1 || L2) - Parallel */}
-                            <path d="M 150 80 L 180 80" fill="none" stroke="#475569" strokeWidth="2" />
-                            {/* Split for L1/L2 */}
-                            <path d="M 180 80 L 180 50 L 210 50" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 180 80 L 180 110 L 210 110" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* Join L1/L2 */}
-                            <path d="M 270 50 L 300 50 L 300 80" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 270 110 L 300 110 L 300 80" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 300 80 L 330 80" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* L3 */}
-                            <path d="M 390 80 L 450 80" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* Top to Dest */}
-                            <path d="M 450 80 C 500 80, 500 150, 520 150" fill="none" stroke="#475569" strokeWidth="2" markerEnd="url(#arrowhead)" />
-
-
-                            {/* Bottom Branch L4 -> (L5 || L6) */}
-                            {/* L4 */}
-                            <path d="M 150 220 L 210 220" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 270 220 L 300 220" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* Split for L5/L6 */}
-                            <path d="M 300 220 L 300 190 L 330 190" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 300 220 L 300 250 L 330 250" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* Join L5/L6 */}
-                            <path d="M 390 190 L 420 190 L 420 220" fill="none" stroke="#475569" strokeWidth="2" />
-                            <path d="M 390 250 L 420 250 L 420 220" fill="none" stroke="#475569" strokeWidth="2" />
-
-                            {/* Bottom to Dest */}
-                            <path d="M 420 220 C 470 220, 500 150, 520 150" fill="none" stroke="#475569" strokeWidth="2" />
-
-
-                            {/* Components */}
-                            <foreignObject x="210" y="30" width="60" height="40">
-                                <LineViz status={currentStatus?.l1} label="L1" compact />
-                            </foreignObject>
-                            <foreignObject x="210" y="90" width="60" height="40">
-                                <LineViz status={currentStatus?.l2} label="L2" compact />
-                            </foreignObject>
-                            <foreignObject x="330" y="60" width="60" height="40">
-                                <LineViz status={currentStatus?.l3} label="L3" compact />
-                            </foreignObject>
-
-                            <foreignObject x="210" y="200" width="60" height="40">
-                                <LineViz status={currentStatus?.l4} label="L4" compact />
-                            </foreignObject>
-                            <foreignObject x="330" y="170" width="60" height="40">
-                                <LineViz status={currentStatus?.l5} label="L5" compact />
-                            </foreignObject>
-                            <foreignObject x="330" y="230" width="60" height="40">
-                                <LineViz status={currentStatus?.l6} label="L6" compact />
-                            </foreignObject>
-
-                        </svg>
-
-                        <div className="text-xs text-slate-500 mt-2 text-center max-w-sm">
-                            <span className="text-blue-400 font-semibold">Top:</span> (L1 || L2) → L3 &nbsp;|&nbsp; <span className="text-blue-400 font-semibold">Bottom:</span> L4 → (L5 || L6)
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="bg-slate-900/50 rounded-lg p-6">
-                    <h3 className="text-slate-300 font-semibold mb-4">Simulation Results</h3>
-
-                    <div className="space-y-6">
-                        <div>
-                            <div className="text-sm text-slate-400 mb-1">Experimental Probability</div>
-                            <div className="text-3xl text-yellow-400">{(experimentalProb * 100).toFixed(2)}%</div>
-                            <div className="text-xs text-slate-500">
-                                {successCount} successes / {simulationCount} runs
+                        <h3 className="text-slate-300 font-semibold mb-4 flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-blue-400" />
+                            Results
+                        </h3>
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div>
+                                    <div className="text-sm text-slate-400 mb-1">Experimental Reliability</div>
+                                    <div className="text-3xl text-yellow-400 font-mono">{(experimentalProb * 100).toFixed(2)}%</div>
+                                    <div className="text-xs text-slate-500">{successCount} / {simulationCount}</div>
+                                </div>
                             </div>
-                        </div>
+                            <div className="mt-4 bg-slate-800/50 rounded p-2">
+                                <button
+                                    onClick={() => setShowGraph(!showGraph)}
+                                    className="mb-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-1 px-3 rounded border border-slate-600 transition-colors flex items-center gap-2"
+                                >
+                                    <Activity className="w-3 h-3" />
+                                    {showGraph ? 'Hide Convergence Graph' : 'View Convergence Graph'}
+                                </button>
 
-                        <div>
-                            <div className="text-sm text-slate-400 mb-1">Theoretical Probability</div>
-                            <div className="text-2xl text-blue-400">{(theoreticalProb * 100).toFixed(2)}%</div>
-                        </div>
-
-                        <div className="h-48 w-full mt-4">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={convergenceData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                    <XAxis
-                                        dataKey="simulations"
-                                        stroke="#94a3b8"
-                                        tick={{ fontSize: 10 }}
-                                        tickFormatter={(val) => val > 1000 ? `${(val / 1000).toFixed(0)}k` : val}
-                                    />
-                                    <YAxis
-                                        domain={[0, 1]}
-                                        stroke="#94a3b8"
-                                        tick={{ fontSize: 10 }}
-                                    />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
-                                        labelStyle={{ color: '#94a3b8' }}
-                                    />
-                                    <ReferenceLine y={theoreticalProb} stroke="#60a5fa" strokeDasharray="3 3" />
-                                    <Line type="monotone" dataKey="probability" stroke="#facc15" dot={false} strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                        <div className="text-xs text-slate-500 text-center">
-                            Yellow: Experimental, Blue Dashed: Theoretical
+                                {showGraph && (
+                                    <div className="h-40 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={convergenceData}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                                <XAxis dataKey="simulations" stroke="#94a3b8" tick={{ fontSize: 10 }} tickFormatter={(val) => val > 1000 ? `${(val / 1000).toFixed(0)}k` : val} />
+                                                <YAxis domain={[0, 1]} stroke="#94a3b8" tick={{ fontSize: 10 }} />
+                                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} labelStyle={{ color: '#94a3b8' }} />
+                                                <Line type="monotone" dataKey="probability" stroke="#facc15" dot={false} strokeWidth={2} isAnimationActive={false} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, RotateCcw, Pause, Spade, TrendingUp } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from "recharts";
+import { Play, RotateCcw, Pause, Spade, Activity } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface BlackjackSimulationProps {
     theoreticalProb: number;
@@ -9,34 +9,22 @@ interface BlackjackSimulationProps {
 export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProps) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [simulationSpeed, setSimulationSpeed] = useState(20);
+    const [showGraph, setShowGraph] = useState(false);
 
     // UI State
     const [count, setCount] = useState(0);
     const [blackjacks, setBlackjackCount] = useState(0);
     const [currentHand, setCurrentHand] = useState<string[]>([]);
 
-    // Chart Data
-    const [chartData, setChartData] = useState<Array<{ simulations: number; probability: number }>>([]);
+    // Chart State
+    const [chartPoints, setChartPoints] = useState<Array<{ x: number, y: number }>>([]);
 
-    // Debug logging
-    useEffect(() => {
-        console.log("BlackjackSimulation Mounted. TProb:", theoreticalProb);
-    }, []);
-
-    useEffect(() => {
-        if (chartData.length > 0) {
-            console.log("Chart Data Updated. Points:", chartData.length, "Last Val:", chartData[chartData.length - 1]);
-        }
-    }, [chartData]);
-
-    // Ref for high-speed value tracking without frequent re-renders
     const stateRef = useRef({
         count: 0,
         blackjacks: 0,
-        data: [] as Array<{ simulations: number; probability: number }>
+        data: [] as Array<{ x: number, y: number }>
     });
 
-    // Speed of simulation
     const BATCH_SIZE = 10;
     const suits = ['S', 'H', 'D', 'C'];
     const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
@@ -62,9 +50,7 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
         for (let i = 0; i < BATCH_SIZE; i++) {
             const idx1 = Math.floor(Math.random() * 52);
             let idx2 = Math.floor(Math.random() * 52);
-            while (idx2 === idx1) {
-                idx2 = Math.floor(Math.random() * 52);
-            }
+            while (idx2 === idx1) { idx2 = Math.floor(Math.random() * 52); }
 
             const getCard = (idx: number) => {
                 const suitIdx = Math.floor(idx / 13);
@@ -79,35 +65,24 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
             if (i === BATCH_SIZE - 1) lastHand = [c1, c2];
         }
 
-        // Update Refs
         stateRef.current.count += BATCH_SIZE;
         stateRef.current.blackjacks += newBlackjacks;
 
-        // Logic for chart data updates
         const c = stateRef.current.count;
         const bj = stateRef.current.blackjacks;
 
-        // Push data point periodically
         if (c % 50 === 0 || c < 500) {
-            stateRef.current.data.push({
-                simulations: c,
-                probability: bj / c
-            });
-            // Force chart update
-            setChartData([...stateRef.current.data]);
+            stateRef.current.data.push({ x: c, y: bj / c });
+            setChartPoints(Array.from(stateRef.current.data));
         }
 
-        // Update UI counters
         setCount(c);
         setBlackjackCount(bj);
         setCurrentHand(lastHand);
     };
 
-    // Callback ref pattern for interval
     const savedCallback = useRef(runBatch);
-    useEffect(() => {
-        savedCallback.current = runBatch;
-    });
+    useEffect(() => { savedCallback.current = runBatch; });
 
     useEffect(() => {
         if (!isPlaying) return;
@@ -121,24 +96,19 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
         setCount(0);
         setBlackjackCount(0);
         setCurrentHand([]);
-        setChartData([]);
+        setChartPoints([]);
     };
 
     const experimentalProb = count > 0 ? blackjacks / count : 0;
 
     const renderCard = (cardCode: string) => {
-        if (!cardCode) return <img src="https://deckofcardsapi.com/static/img/back.png" alt="Car Back" className="w-24 h-36 rounded-lg shadow-xl" />;
+        if (!cardCode) return <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" className="w-24 h-36 rounded-lg shadow-xl" />;
         let rank = cardCode.slice(0, -1);
         const suit = cardCode.slice(-1);
         let imageRank = rank === 'T' ? '0' : rank;
-
         return (
             <div className="w-24 h-36 rounded-lg shadow-xl relative group hover:-translate-y-1 transition-transform">
-                <img
-                    src={`https://deckofcardsapi.com/static/img/${imageRank}${suit}.png`}
-                    alt={`${rank} of ${suit}`}
-                    className="w-full h-full object-contain rounded-lg"
-                />
+                <img src={`https://deckofcardsapi.com/static/img/${imageRank}${suit}.png`} alt={`${rank} of ${suit}`} className="w-full h-full object-contain rounded-lg" />
             </div>
         );
     };
@@ -167,53 +137,31 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                                 className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition-colors w-full"
                             >
                                 <RotateCcw className="w-4 h-4" />
-                                <TrendingUp className="w-4 h-4" />
+                                <Activity className="w-4 h-4" />
                                 Reset
                             </button>
                         </div>
-
                         <div className="flex flex-col justify-center col-span-2 sm:col-span-1 bg-slate-900/50 p-2 rounded">
                             <label className="text-xs text-slate-400 flex justify-between mb-1">
-                                <span>Speed</span>
-                                <span>{simulationSpeed}x</span>
+                                <span>Speed</span> <span>{simulationSpeed}x</span>
                             </label>
-                            <input
-                                type="range"
-                                min="1"
-                                max="100"
-                                value={simulationSpeed}
-                                onChange={(e) => setSimulationSpeed(Number(e.target.value))}
-                                className="w-full accent-blue-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                            />
+                            <input type="range" min="1" max="100" value={simulationSpeed} onChange={(e) => setSimulationSpeed(Number(e.target.value))} className="w-full accent-blue-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                         </div>
-
                         <div className="col-span-2 flex items-center bg-slate-900/50 px-3 py-1 rounded text-sm text-slate-400 justify-between">
-                            <span>Hands:</span>
-                            <span className="text-white font-mono">{count.toLocaleString()}</span>
+                            <span>Hands:</span> <span className="text-white font-mono">{count.toLocaleString()}</span>
                         </div>
                     </div>
-
                     <div className="bg-slate-900/50 rounded-lg p-8 flex flex-col items-center justify-center min-h-[300px]">
                         <div className="text-sm text-slate-400 mb-6 font-medium">Current Hand</div>
                         <div className="flex gap-4 mb-8">
                             {currentHand.length === 2 ? (
-                                <>
-                                    {renderCard(currentHand[0])}
-                                    {renderCard(currentHand[1])}
-                                </>
+                                <> {renderCard(currentHand[0])} {renderCard(currentHand[1])} </>
                             ) : (
-                                <>
-                                    <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" className="w-24 h-36 rounded-lg shadow-xl opacity-50" />
-                                    <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" className="w-24 h-36 rounded-lg shadow-xl opacity-50" />
-                                </>
+                                <> <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" className="w-24 h-36 rounded-lg shadow-xl opacity-50" /> <img src="https://deckofcardsapi.com/static/img/back.png" alt="Card Back" className="w-24 h-36 rounded-lg shadow-xl opacity-50" /> </>
                             )}
                         </div>
-
                         {currentHand.length === 2 && (
-                            <div className={`px-4 py-2 rounded-full text-sm font-bold ${isBlackjack(currentHand[0], currentHand[1])
-                                ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 animate-pulse'
-                                : 'bg-slate-800 text-slate-500'
-                                }`}>
+                            <div className={`px-4 py-2 rounded-full text-sm font-bold ${isBlackjack(currentHand[0], currentHand[1]) ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 animate-pulse' : 'bg-slate-800 text-slate-500'}`}>
                                 {isBlackjack(currentHand[0], currentHand[1]) ? 'BLACKJACK!' : 'Regular Hand'}
                             </div>
                         )}
@@ -221,61 +169,61 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                 </div>
 
                 {/* Statistics & Chart Column */}
-                <div className="bg-slate-900/50 rounded-lg p-6 flex flex-col h-full border border-blue-500/30">
+                <div className="bg-slate-900/50 rounded-lg p-6 flex flex-col border border-blue-500/30 overflow-hidden">
                     <h3 className="text-slate-300 font-semibold mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-blue-400" />
+                        <Activity className="w-4 h-4 text-blue-400" />
                         Frequentist Probability Approach
                     </h3>
                     <p className="text-xs text-slate-400 mb-4">
-                        As the number of trials increases, the experimental probability converges to the theoretical probability (Law of Large Numbers).
+                        As the number of trials increases, the experimental probability converges to the theoretical probability.
                     </p>
-
-                    <div className="space-y-6 flex-1 flex flex-col">
+                    <div className="space-y-6 flex flex-col">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <div className="text-xs text-slate-400 mb-1">Experimental P</div>
-                                <div className="text-2xl text-yellow-400">{(experimentalProb * 100).toFixed(4)}%</div>
-                                <div className="text-[10px] text-slate-500">
-                                    {blackjacks} / {count}
-                                </div>
+                                <div className="text-2xl text-yellow-400" id="experimental-prob">{experimentalProb ? (experimentalProb * 100).toFixed(4) : "0.0000"}%</div>
+                                <div className="text-[10px] text-slate-500">{blackjacks} / {count}</div>
                             </div>
-
                             <div>
                                 <div className="text-xs text-slate-400 mb-1">Theoretical P</div>
                                 <div className="text-2xl text-blue-400">{(theoreticalProb * 100).toFixed(4)}%</div>
                             </div>
                         </div>
 
-                        {/* Force height to 300px to ensure Recharts renders */}
-                        <div className="w-full h-[300px] bg-slate-900/50 rounded p-2" style={{ minHeight: '300px' }}>
-                            {chartData.length > 0 ? (
+                        <button
+                            onClick={() => setShowGraph(!showGraph)}
+                            className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
+                        >
+                            <Activity className="w-3 h-3" />
+                            {showGraph ? 'Hide Convergence Graph' : 'View Convergence Graph'}
+                        </button>
+
+                        {/* Recharts Graph */}
+                        {showGraph && (
+                            <div className="relative w-full h-64 bg-slate-900 rounded border border-slate-700 p-2">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={chartData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                    <LineChart data={chartPoints}>
                                         <XAxis
-                                            dataKey="simulations"
-                                            stroke="#94a3b8"
-                                            tick={{ fontSize: 10 }}
-                                            tickFormatter={(val) => val > 1000 ? `${(val / 1000).toFixed(0)}k` : val}
+                                            dataKey="x"
+                                            stroke="#64748b"
+                                            tickFormatter={(val) => val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}
+                                            fontSize={10}
                                         />
                                         <YAxis
-                                            domain={[0, 'auto']}
-                                            stroke="#94a3b8"
-                                            tick={{ fontSize: 10 }}
-                                            tickFormatter={(val) => val.toFixed(2)}
+                                            domain={['auto', 'auto']}
+                                            stroke="#64748b"
+                                            fontSize={10}
+                                            tickFormatter={(val) => (val * 100).toFixed(1) + '%'}
                                         />
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
-                                            labelStyle={{ color: '#94a3b8' }}
+                                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155' }}
+                                            labelFormatter={(val) => `Hand: ${val}`}
                                             formatter={(val: number) => [(val * 100).toFixed(4) + '%', 'Probability']}
                                         />
-                                        <Legend wrapperStyle={{ fontSize: '10px' }} verticalAlign="top" />
-                                        {/* Simplified ReferenceLine to verify it's not the crash cause */}
                                         <ReferenceLine y={theoreticalProb} stroke="#60a5fa" strokeDasharray="3 3" />
                                         <Line
                                             type="monotone"
-                                            name="Experimental P"
-                                            dataKey="probability"
+                                            dataKey="y"
                                             stroke="#facc15"
                                             strokeWidth={2}
                                             dot={false}
@@ -283,17 +231,17 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                                         />
                                     </LineChart>
                                 </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm gap-2">
-                                    <TrendingUp className="w-8 h-8 text-slate-600" />
-                                    <span>Press Start to generate data</span>
-                                    <span className="text-xs text-slate-600">Chart will appear here</span>
+                                <div className="text-[10px] text-slate-500 text-center mt-1">
+                                    Yellow: Experimental, Blue Dashed: Theoretical
                                 </div>
-                            )}
-                        </div>
-                        <div className="text-[10px] text-slate-500 text-center mt-2">
-                            The yellow line should converge to the blue line.
-                        </div>
+                            </div>
+                        )}
+
+                        {!showGraph && (
+                            <div className="h-16 flex items-center justify-center text-xs text-slate-600 italic">
+                                Graph hidden. Click above to view history.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
