@@ -18,6 +18,17 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
     // Chart Data
     const [chartData, setChartData] = useState<Array<{ simulations: number; probability: number }>>([]);
 
+    // Debug logging
+    useEffect(() => {
+        console.log("BlackjackSimulation Mounted. TProb:", theoreticalProb);
+    }, []);
+
+    useEffect(() => {
+        if (chartData.length > 0) {
+            console.log("Chart Data Updated. Points:", chartData.length, "Last Val:", chartData[chartData.length - 1]);
+        }
+    }, [chartData]);
+
     // Ref for high-speed value tracking without frequent re-renders
     const stateRef = useRef({
         count: 0,
@@ -77,7 +88,7 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
         const bj = stateRef.current.blackjacks;
 
         // Push data point periodically
-        if (c % 50 === 0 || c < 200) {
+        if (c % 50 === 0 || c < 500) {
             stateRef.current.data.push({
                 simulations: c,
                 probability: bj / c
@@ -210,7 +221,7 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                 </div>
 
                 {/* Statistics & Chart Column */}
-                <div className="bg-slate-900/50 rounded-lg p-6 flex flex-col h-full">
+                <div className="bg-slate-900/50 rounded-lg p-6 flex flex-col h-full border border-blue-500/30">
                     <h3 className="text-slate-300 font-semibold mb-4 flex items-center gap-2">
                         <TrendingUp className="w-4 h-4 text-blue-400" />
                         Frequentist Probability Approach
@@ -235,7 +246,8 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                             </div>
                         </div>
 
-                        <div className="flex-1 w-full min-h-[250px] bg-slate-900/50 rounded p-2">
+                        {/* Force height to 300px to ensure Recharts renders */}
+                        <div className="w-full h-[300px] bg-slate-900/50 rounded p-2" style={{ minHeight: '300px' }}>
                             {chartData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={chartData}>
@@ -258,7 +270,8 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                                             formatter={(val: number) => [(val * 100).toFixed(4) + '%', 'Probability']}
                                         />
                                         <Legend wrapperStyle={{ fontSize: '10px' }} verticalAlign="top" />
-                                        <ReferenceLine y={theoreticalProb} stroke="#60a5fa" strokeDasharray="3 3" label={{ value: 'Theoretical', fill: '#60a5fa', fontSize: 10, position: 'insideRight' }} />
+                                        {/* Simplified ReferenceLine to verify it's not the crash cause */}
+                                        <ReferenceLine y={theoreticalProb} stroke="#60a5fa" strokeDasharray="3 3" />
                                         <Line
                                             type="monotone"
                                             name="Experimental P"
@@ -271,8 +284,10 @@ export function BlackjackSimulation({ theoreticalProb }: BlackjackSimulationProp
                                     </LineChart>
                                 </ResponsiveContainer>
                             ) : (
-                                <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                                    Press Start to generate data
+                                <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm gap-2">
+                                    <TrendingUp className="w-8 h-8 text-slate-600" />
+                                    <span>Press Start to generate data</span>
+                                    <span className="text-xs text-slate-600">Chart will appear here</span>
                                 </div>
                             )}
                         </div>
