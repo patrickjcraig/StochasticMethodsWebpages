@@ -36,70 +36,55 @@ export function ProbabilityCalculator({
 
   // Memoize the probability calculation to avoid re-computing on every valid render unless inputs change
   const calculateProbability = useMemo(() => {
-    // Total number of ways to arrange K honeypots among N total computers
-    // This is the size of the sample space |Ω|
     const totalPermutations = binomial(totalComputers, honeypots);
 
-    // Define the specific positions that are checked/attacked.
-    // The problem statement implies checking every 2nd position (0, 2, 4...)
+    let currentH = honeypots;
+    let currentTotal = totalComputers;
+    let probabilityCaught = 0;
+    let probabilitySurvive = 1;
+
+    // Iterative calculation for the specific game rules
+    // Step k corresponds to attack k (checking positions 2k and 2k+1)
+    for (let i = 0; i < numAttacks; i++) {
+      // If we can't form a pair, we stop
+      if (currentTotal < 2) break;
+
+      // Probability of catching at this step (First card is H)
+      // P(Catch) = currentH / currentTotal
+      const pCatch = currentH / currentTotal;
+
+      probabilityCaught += probabilitySurvive * pCatch;
+
+      // To continue to the next step, we must NOT be caught AND the hacker must NOT win.
+      // This implies the pair must be (V, V).
+      // (V, H) is a Hacker Win (Game Over, outcome: Missed)
+      // (H, ?) is Caught (Game Over, outcome: Caught)
+
+      const currentV = currentTotal - currentH;
+
+      // If we don't have enough victims for (V, V), survival probability becomes 0
+      if (currentV < 2) {
+        probabilitySurvive = 0;
+        break;
+      }
+
+      // P(V, V) = P(1st is V) * P(2nd is V | 1st is V)
+      const pVV = (currentV / currentTotal) * ((currentV - 1) / (currentTotal - 1));
+
+      probabilitySurvive *= pVV;
+
+      // Advance state: We "consumed" 2 positions (which were V, V)
+      currentTotal -= 2;
+      // currentH remains same, as we removed 2 Victims
+    }
+
+    const caughtPermutations = Math.round(probabilityCaught * totalPermutations);
     const checkPositions = Array.from({ length: numAttacks }, (_, i) => i * 2);
-    const numCheckPositions = checkPositions.length;
-
-    // Safety check: Inclusion-Exclusion is O(2^m) where m is the number of checked positions.
-    // If m is too large, it stops the browser from freezing.
-    if (numCheckPositions > 25) {
-      return {
-        totalPermutations,
-        caughtPermutations: 0,
-        probability: 0,
-        checkPositions,
-        tooLarge: true
-      };
-    }
-
-    let caughtPermutations = 0;
-
-    // Use the Inclusion-Exclusion Principle to calculate the number of arrangements where at least one honeypot is found.
-    // Let A_i be the set of arrangements where a honeypot is at position checkPositions[i].
-    // We want |A_0 ∪ A_1 ∪ ... ∪ A_m|
-    // This equals Σ|A_i| - Σ|A_i ∩ A_j| + Σ|A_i ∩ A_j ∩ A_k| - ...
-
-    // We iterate through every possible non-empty subset of check positions using a bitmask
-    for (let mask = 1; mask < (1 << numCheckPositions); mask++) {
-      let honeypotsAtPositions = 0;
-
-      // Count how many positions are required to be honeypots in this subset (mask)
-      for (let i = 0; i < numCheckPositions; i++) {
-        if (mask & (1 << i)) {
-          honeypotsAtPositions++;
-        }
-      }
-
-      // If the subset requires more honeypots than we actually have, this configuration is impossible
-      if (honeypotsAtPositions > honeypots) continue;
-
-      // Calculate how many ways we can arrange the REMAINING honeypots in the REMAINING positions
-      const remainingHoneypots = honeypots - honeypotsAtPositions;
-      const remainingPositions = totalComputers - honeypotsAtPositions;
-
-      const ways = binomial(remainingPositions, remainingHoneypots);
-
-      // Apply the principle:
-      // If the size of the subset is odd, we ADD to the total.
-      // If the size of the subset is even, we SUBTRACT from the total.
-      if (honeypotsAtPositions % 2 === 1) {
-        caughtPermutations += ways;
-      } else {
-        caughtPermutations -= ways;
-      }
-    }
-
-    const probability = caughtPermutations / totalPermutations;
 
     return {
       totalPermutations,
       caughtPermutations,
-      probability,
+      probability: probabilityCaught,
       checkPositions,
       tooLarge: false
     };
@@ -163,13 +148,15 @@ export function ProbabilityCalculator({
             <div className="text-sm text-slate-400 mb-2">Calculation Method</div>
             <div className="text-xs text-slate-300 space-y-2">
               <p>
-                Event C (caught) = C₁ ∪ C₃ ∪ C₅ ∪ C₇ ∪ ...
+                Calculated iteratively considering path-dependent outcomes at each attack step (pair of computers):
               </p>
+              <ul className="list-disc list-inside">
+                <li><strong>Caught:</strong> Honeypot found at first index of pair.</li>
+                <li><strong>Hacker Win:</strong> Victim at first, Honeypot at second (Game Over, not caught).</li>
+                <li><strong>Continue:</strong> Victim at both positions.</li>
+              </ul>
               <p>
-                Where Cᵢ = "honeypot at position i"
-              </p>
-              <p>
-                Using inclusion-exclusion principle to avoid double-counting overlapping events.
+                P(Caught) = Σ P(Survive previous) × P(Catch current)
               </p>
             </div>
           </div>

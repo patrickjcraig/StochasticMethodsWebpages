@@ -214,7 +214,11 @@ export default function App() {
               min="2"
               max="50"
               value={totalComputers}
-              onChange={(e) => setTotalComputers(Number(e.target.value))}
+              onChange={(e) => {
+                const newTotal = Number(e.target.value);
+                setTotalComputers(newTotal);
+                setNumAttacks(Math.floor(newTotal / 2));
+              }}
               className="w-full"
             />
             <div className="text-2xl mt-2">{totalComputers}</div>

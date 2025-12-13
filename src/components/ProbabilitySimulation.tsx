@@ -151,13 +151,23 @@ export function ProbabilitySimulation({
                 let caught = false;
 
                 // Check if any of the attacked positions contain a honeypot.
-                // If even one honeypot is hit, the attack is considered DETECTED.
+                // If even one honeypot is hit (at the first index of a pair), the attack is considered DETECTED.
+                // However, if the hacker Wins (V, H) before being caught, the game ends and they are NOT caught.
                 for (let i = 0; i < checkPositions.length; i++) {
                     const pos = checkPositions[i];
-                    // Check if we hit a honeypot at this position (bounds check included)
-                    if (pos < computers.length && computers[pos] === "H") {
+
+                    // Bounds check
+                    if (pos >= computers.length) break;
+
+                    // Check if we hit a honeypot at this position (first of pair) - CAUGHT
+                    if (computers[pos] === "H") {
                         caught = true;
-                        break; // Stop checking further, as one detection is enough
+                        break;
+                    }
+
+                    // Check if Hacker Wins (V at first, H at second) - GAME OVER (Not Caught)
+                    if (pos + 1 < computers.length && computers[pos] === "V" && computers[pos + 1] === "H") {
+                        break; // Hacker wins, loop ends, caught remains false
                     }
                 }
 
