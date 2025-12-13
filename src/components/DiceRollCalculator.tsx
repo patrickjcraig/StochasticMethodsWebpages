@@ -4,26 +4,31 @@ import { DiceRollSimulation } from './DiceRollSimulation';
 
 export function DiceRollCalculator() {
   const [targetProb, setTargetProb] = useState(0.95);
-  const [criterion, setCriterion] = useState<'gt4' | 'eq6'>('gt4');
+  const [selectedFaces, setSelectedFaces] = useState<number[]>([5, 6]);
 
   const calculations = useMemo(() => {
     // For a fair die:
-    // P(outcome > 4) = P(5 or 6) = 2/6 = 1/3
-    // P(outcome = 6) = 1/6
+    // P(success) = |selectedFaces| / 6
 
-    const pSuccess = criterion === 'gt4' ? 2 / 6 : 1 / 6;
+    const pSuccess = selectedFaces.length / 6;
     const pFail = 1 - pSuccess;
 
     // We want P(at least one success in M rolls) >= targetProb
-    // P(at least one success) = 1 - P(all failures) = 1 - (pFail)^M
-    // So: 1 - (pFail)^M >= targetProb
-    // (pFail)^M <= 1 - targetProb
-    // M * log(pFail) <= log(1 - targetProb)
-    // Since log(pFail) < 0:
     // M >= log(1 - targetProb) / log(pFail)
 
-    const M = Math.ceil(Math.log(1 - targetProb) / Math.log(pFail));
-    const actualProb = 1 - Math.pow(pFail, M);
+    let M = 0;
+    let actualProb = 0;
+
+    if (pSuccess === 0) {
+      M = Infinity;
+      actualProb = 0;
+    } else if (pSuccess === 1) {
+      M = 1;
+      actualProb = 1;
+    } else {
+      M = Math.ceil(Math.log(1 - targetProb) / Math.log(pFail));
+      actualProb = 1 - Math.pow(pFail, M);
+    }
 
     return {
       pSuccess,
@@ -32,7 +37,21 @@ export function DiceRollCalculator() {
       actualProb,
       targetProb
     };
-  }, [targetProb, criterion]);
+  }, [targetProb, selectedFaces]);
+
+  const toggleFace = (face: number) => {
+    setSelectedFaces(prev => {
+      if (prev.includes(face)) {
+        return prev.filter(f => f !== face);
+      } else {
+        return [...prev, face].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const getDieFace = (val: number) => {
+    return ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][val - 1];
+  };
 
   const commonTargets = [
     { label: '95%', value: 0.95 },
@@ -70,30 +89,26 @@ export function DiceRollCalculator() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Success Criterion</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setCriterion('gt4')}
-                className={`p-3 rounded-lg border-2 transition-all ${criterion === 'gt4'
-                  ? 'border-blue-500 bg-blue-900/30'
-                  : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
-                  }`}
-              >
-                <div className="text-lg mb-1">Outcome &gt; 4</div>
-                <div className="text-xs text-slate-400">(roll a 5 or 6)</div>
-                <div className="text-sm text-blue-300 mt-1">P = 2/6 = 1/3</div>
-              </button>
-              <button
-                onClick={() => setCriterion('eq6')}
-                className={`p-3 rounded-lg border-2 transition-all ${criterion === 'eq6'
-                  ? 'border-blue-500 bg-blue-900/30'
-                  : 'border-slate-600 bg-slate-900/20 hover:border-slate-500'
-                  }`}
-              >
-                <div className="text-lg mb-1">Outcome = 6</div>
-                <div className="text-xs text-slate-400">(roll a 6)</div>
-                <div className="text-sm text-purple-300 mt-1">P = 1/6</div>
-              </button>
+            <label className="block text-sm text-slate-400 mb-2">Success Faces (Select Multiple)</label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5, 6].map(face => (
+                <button
+                  key={face}
+                  onClick={() => toggleFace(face)}
+                  className={`w-12 h-12 rounded-lg text-2xl flex items-center justify-center transition-all ${selectedFaces.includes(face)
+                    ? 'bg-blue-600 text-white ring-2 ring-blue-400 shadow-lg shadow-blue-900/50'
+                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                    }`}
+                  title={`Toggle face ${face}`}
+                >
+                  {getDieFace(face)}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 text-sm text-slate-400">
+              Selected: {selectedFaces.length > 0 ? selectedFaces.join(', ') : 'None'}
+              <span className="mx-2">•</span>
+              P(Success) = {calculations.pSuccess.toFixed(4)} ({selectedFaces.length}/6)
             </div>
           </div>
 
@@ -140,7 +155,7 @@ export function DiceRollCalculator() {
             <div className="text-sm text-slate-400 mb-1">P(Success on one roll)</div>
             <div className="text-2xl">{calculations.pSuccess.toFixed(4)}</div>
             <div className="text-xs text-slate-500 mt-1">
-              = {criterion === 'gt4' ? '2/6' : '1/6'}
+              = {selectedFaces.length}/6
             </div>
           </div>
 
@@ -148,14 +163,16 @@ export function DiceRollCalculator() {
             <div className="text-sm text-slate-400 mb-1">P(Failure on one roll)</div>
             <div className="text-2xl">{calculations.pFail.toFixed(4)}</div>
             <div className="text-xs text-slate-500 mt-1">
-              = {criterion === 'gt4' ? '4/6' : '5/6'}
+              = {6 - selectedFaces.length}/6
             </div>
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-green-900/30 to-blue-900/30 border-2 border-green-500/30 rounded-lg p-6">
           <div className="text-sm text-slate-300 mb-2">Minimum Number of Rolls Required:</div>
-          <div className="text-6xl text-green-300 mb-3">{calculations.M}</div>
+          <div className="text-6xl text-green-300 mb-3">
+            {calculations.M === Infinity ? '∞' : calculations.M}
+          </div>
           <div className="text-sm text-slate-400">
             Formula: M = ⌈log(1 - {targetProb}) / log({calculations.pFail.toFixed(4)})⌉
           </div>

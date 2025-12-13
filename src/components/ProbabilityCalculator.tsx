@@ -2,11 +2,12 @@ import React, { useMemo } from 'react';
 import { Calculator } from 'lucide-react';
 import { ProbabilitySimulation } from './ProbabilitySimulation';
 
+// Define Props for the Probability Calculator
 interface ProbabilityCalculatorProps {
-  totalComputers: number;
-  honeypots: number;
-  victims: number;
-  numAttacks: number;
+  totalComputers: number; // N
+  honeypots: number;      // K (traps)
+  victims: number;        // N - K (safe)
+  numAttacks: number;     // How many positions are checked
 }
 
 export function ProbabilityCalculator({
@@ -16,30 +17,36 @@ export function ProbabilityCalculator({
   numAttacks
 }: ProbabilityCalculatorProps) {
 
-  // Optimized binomial coefficient calculation
+  // Optimized binomial coefficient calculation (n Choose k)
+  // Calculates the number of ways to choose k items from a set of n distinct items
   const binomial = (n: number, k: number): number => {
     if (k > n || k < 0) return 0;
     if (k === 0 || k === n) return 1;
 
-    // Use the smaller of k or n-k for efficiency
+    // Optimization: C(n, k) == C(n, n-k), so use the smaller k to reduce iterations
     k = Math.min(k, n - k);
 
     let result = 1;
     for (let i = 0; i < k; i++) {
+      // Iteratively calculate the product form: n * (n-1) * ... / (1 * 2 * ...)
       result = result * (n - i) / (i + 1);
     }
     return Math.round(result);
   };
 
+  // Memoize the probability calculation to avoid re-computing on every valid render unless inputs change
   const calculateProbability = useMemo(() => {
-    // Total number of ways to arrange H honeypots among N computers
+    // Total number of ways to arrange K honeypots among N total computers
+    // This is the size of the sample space |Ω|
     const totalPermutations = binomial(totalComputers, honeypots);
 
-    // Check positions are 0, 2, 4, 6, ... (0-indexed)
+    // Define the specific positions that are checked/attacked.
+    // The problem statement implies checking every 2nd position (0, 2, 4...)
     const checkPositions = Array.from({ length: numAttacks }, (_, i) => i * 2);
     const numCheckPositions = checkPositions.length;
 
-    // Limit iterations for very large numbers
+    // Safety check: Inclusion-Exclusion is O(2^m) where m is the number of checked positions.
+    // If m is too large, it stops the browser from freezing.
     if (numCheckPositions > 25) {
       return {
         totalPermutations,
@@ -52,25 +59,34 @@ export function ProbabilityCalculator({
 
     let caughtPermutations = 0;
 
-    // Use inclusion-exclusion principle
+    // Use the Inclusion-Exclusion Principle to calculate the number of arrangements where at least one honeypot is found.
+    // Let A_i be the set of arrangements where a honeypot is at position checkPositions[i].
+    // We want |A_0 ∪ A_1 ∪ ... ∪ A_m|
+    // This equals Σ|A_i| - Σ|A_i ∩ A_j| + Σ|A_i ∩ A_j ∩ A_k| - ...
+
+    // We iterate through every possible non-empty subset of check positions using a bitmask
     for (let mask = 1; mask < (1 << numCheckPositions); mask++) {
       let honeypotsAtPositions = 0;
 
-      // Count set bits
+      // Count how many positions are required to be honeypots in this subset (mask)
       for (let i = 0; i < numCheckPositions; i++) {
         if (mask & (1 << i)) {
           honeypotsAtPositions++;
         }
       }
 
+      // If the subset requires more honeypots than we actually have, this configuration is impossible
       if (honeypotsAtPositions > honeypots) continue;
 
+      // Calculate how many ways we can arrange the REMAINING honeypots in the REMAINING positions
       const remainingHoneypots = honeypots - honeypotsAtPositions;
       const remainingPositions = totalComputers - honeypotsAtPositions;
 
       const ways = binomial(remainingPositions, remainingHoneypots);
 
-      // Inclusion-exclusion: add if odd, subtract if even
+      // Apply the principle:
+      // If the size of the subset is odd, we ADD to the total.
+      // If the size of the subset is even, we SUBTRACT from the total.
       if (honeypotsAtPositions % 2 === 1) {
         caughtPermutations += ways;
       } else {
@@ -88,8 +104,6 @@ export function ProbabilityCalculator({
       tooLarge: false
     };
   }, [totalComputers, honeypots, numAttacks]);
-
-
 
   return (
     <div className="space-y-6">
@@ -166,6 +180,7 @@ export function ProbabilityCalculator({
         </div>
       </div>
 
+      {/* Integrate the Simulation Component */}
       <ProbabilitySimulation
         totalComputers={totalComputers}
         honeypots={honeypots}

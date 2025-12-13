@@ -3,6 +3,7 @@ import { Spade, Heart, Calculator } from 'lucide-react';
 import { BlackjackSimulation } from './BlackjackSimulation';
 
 export function BlackjackCalculator() {
+  // Helper: Factorial function (n!)
   const factorial = (n: number): number => {
     if (n <= 1) return 1;
     let result = 1;
@@ -12,43 +13,53 @@ export function BlackjackCalculator() {
     return result;
   };
 
+  // Helper: Binomial coefficient C(n, k)
+  // Calculates number of ways to choose k items from n without regard to order
   const binomial = (n: number, k: number): number => {
     if (k > n || k < 0) return 0;
     if (k === 0 || k === n) return 1;
     return factorial(n) / (factorial(k) * factorial(n - k));
   };
 
+  // Perform the probability calculation
   const calculations = useMemo(() => {
-    // Total ways to choose 2 cards from 52
-    const totalWays = binomial(52, 2);
+    // 1. Calculate Denominator: Total possible hands of 2 cards
+    // using Combinations (order does NOT matter, so {Ace, 10} is same as {10, Ace})
+    const totalWays = binomial(52, 2); // 52! / (2! * 50!) = 1326
 
-    // Blackjack = 1 Ace + 1 (Ten, Jack, Queen, or King)
-    // Aces: 4 cards
-    // Ten-value cards: 16 cards (4 tens + 4 jacks + 4 queens + 4 kings)
-    const aces = 4;
-    const tenValues = 16;
+    // 2. Calculate Numerator: Ways to get Blackjack
+    // A Blackjack consists of exactly one Ace and exactly one Ten-value card.
+    const aces = 4;        // 4 Aces in a deck
+    const tenValues = 16;  // 10s, Js, Qs, Ks (4 of each)
 
-    // Ways to get blackjack:
-    // Choose 1 ace from 4, and 1 ten-value from 16
-    // Can pick ace first or ten-value first, so: 2 × (4 × 16)
-    // But simpler: total ways = 4 × 16 (ace first, ten second) + 16 × 4 (ten first, ace second)
-    // Wait, when choosing 2 cards, order doesn't matter
-    // So it's just: (# of aces) × (# of ten-values) = 4 × 16 = 64
+    // Using Multiplication Principle:
+    // Ways = (Ways to choose 1 Ace) * (Ways to choose 1 Ten-value)
+    // Ways = C(4, 1) * C(16, 1) = 4 * 16 = 64
     const blackjackWays = aces * tenValues;
 
-    const probability = blackjackWays / totalWays;
+    // 3. Calculate Probability
+    const probability = blackjackWays / totalWays; // 64 / 1326 ≈ 0.0483
 
+    // Note on "Expected" values logic:
+    // Some textbooks/sources calculate this using Permutations (order matters).
+    // Permutations Denominator: P(52, 2) = 52 * 51 = 2652
+    // Permutations Numerator: (Ace then 10) + (10 then Ace) = (4*16) + (16*4) = 64 + 64 = 128
+    // Resulting Probability: 128 / 2652 ≈ 0.0483
+    // The probability is the same, but the raw counts differ by a factor of 2 (2!).
+    // We display comparisons to show this equivalence.
     return {
       totalWays,
       blackjackWays,
       probability,
-      expectedNumerator: 128,
-      expectedDenominator: 2652,
+      expectedNumerator: 128,      // Assuming Permutation-based reference
+      expectedDenominator: 2652,   // Assuming Permutation-based reference
       expectedProbability: 128 / 2652
     };
   }, []);
 
-  const matches = Math.abs(calculations.blackjackWays - calculations.expectedNumerator) === 0;
+  // Check if our probability matches the expected probability (within float epsilon)
+  // We compare probabilities rather than raw counts because of the Permutation vs Combination difference
+  const matches = Math.abs(calculations.probability - calculations.expectedProbability) < 0.000001;
 
   return (
     <div className="space-y-6">
@@ -149,10 +160,15 @@ export function BlackjackCalculator() {
       <BlackjackSimulation theoreticalProb={calculations.expectedProbability} />
 
       <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-600">
-        <h3 className="text-sm mb-2">Why 128/2652 ≠ 64/1326?</h3>
+        <h3 className="text-sm mb-2">Why 128/2652 vs 64/1326?</h3>
         <p className="text-xs text-slate-400">
-          Actually, 128/2652 = 64/1326 when reduced to lowest terms! Both are equal to approximately 0.04827 or 4.827%.
-          The answer key uses 128/2652 which is the unreduced fraction (perhaps counting order: ace-then-ten OR ten-then-ace as separate).
+          They are mathematically equivalent fractions (both equal ~4.83%).
+          <br />
+          - <strong>64/1326</strong> uses Combinations (Order doesn't matter: Ace-Ten is same as Ten-Ace).
+          <br />
+          - <strong>128/2652</strong> uses Permutations (Order matters: Ace-Ten is distinct from Ten-Ace).
+          <br />
+          As long as you use the same method for both numerator and denominator, the probability is correct.
         </p>
       </div>
     </div>

@@ -1,39 +1,58 @@
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Trophy, Activity } from 'lucide-react';
+import { Play, RotateCcw, Trophy } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function PowerballSimulation() {
+    // State to hold the user's selected white ball numbers (5 numbers)
     const [userWhite, setUserWhite] = useState<number[]>([]);
+    // State to hold the user's selected Powerball number (1 number)
     const [userPower, setUserPower] = useState<number | null>(null);
+
+    // State to hold the simulation's drawn white ball numbers
     const [drawWhite, setDrawWhite] = useState<number[]>([]);
+    // State to hold the simulation's drawn Powerball number
     const [drawPower, setDrawPower] = useState<number | null>(null);
+
+    // State to display the text result of the draw (e.g., "$100", "JACKPOT!!!")
     const [result, setResult] = useState<string | null>(null);
+
+    // State to toggle auto-play mode
     const [autoPlay, setAutoPlay] = useState(false);
+    // State to control the speed of the simulation (draws per second roughly)
     const [simulationSpeed, setSimulationSpeed] = useState(10);
+
+    // State to track session statistics: total played, total winnings, and total cost
     const [stats, setStats] = useState({
         played: 0,
         winnings: 0,
         cost: 0
     });
-    const [history, setHistory] = useState<Array<{ played: number; roi: number }>>([]);
-    const [showGraph, setShowGraph] = useState(false);
 
+    // State to track history of ROI (Return on Investment) for plotting the graph
+    const [history, setHistory] = useState<Array<{ played: number; roi: number }>>([]);
+
+    // Function to generate random numbers for the user (Quick Pick)
     const quickPick = () => {
         const white: number[] = [];
+        // Generate 5 unique random numbers between 1 and 69
         while (white.length < 5) {
             const n = Math.floor(Math.random() * 69) + 1;
             if (!white.includes(n)) white.push(n);
         }
-        white.sort((a, b) => a - b);
+        white.sort((a, b) => a - b); // Sort for display
         setUserWhite(white);
-        setUserPower(Math.floor(Math.random() * 26) + 1);
+        setUserPower(Math.floor(Math.random() * 26) + 1); // Powerball 1-26
+
+        // Reset specific session states when picking new numbers
         setResult(null);
         setDrawWhite([]);
         setDrawPower(null);
-        setHistory([]); // Reset history on new numbers (optional, but cleaner)
+        setHistory([]); // clear history to start fresh tracking for these numbers
     };
 
+    // Function to simulate a single lottery draw
     const draw = () => {
+        // Generate draw numbers
         const white: number[] = [];
         while (white.length < 5) {
             const n = Math.floor(Math.random() * 69) + 1;
@@ -45,40 +64,53 @@ export function PowerballSimulation() {
         setDrawWhite(white);
         setDrawPower(power);
 
-        // Check winnings
+        // Check for winnings against user's numbers
         if (userWhite.length === 5 && userPower !== null) {
+            // Count matching white balls
             const whiteMatches = userWhite.filter(n => white.includes(n)).length;
+            // Check if Powerball matches
             const powerMatch = userPower === power;
 
             let prize = 0;
             let text = 'No Prize';
 
+            // Determine prize tier based on Powerball rules (Standard Payouts)
+            // Jackpot: 5 White + Powerball (Assuming $1B for simulation excitement)
             if (whiteMatches === 5 && powerMatch) { prize = 1000000000; text = 'JACKPOT!!!'; }
+            // Match 5 White: $1 Million
             else if (whiteMatches === 5) { prize = 1000000; text = '$1,000,000'; }
+            // Match 4 White + Powerball: $50,000
             else if (whiteMatches === 4 && powerMatch) { prize = 50000; text = '$50,000'; }
+            // Match 4 White: $100
             else if (whiteMatches === 4) { prize = 100; text = '$100'; }
+            // Match 3 White + Powerball: $100
             else if (whiteMatches === 3 && powerMatch) { prize = 100; text = '$100'; }
+            // Match 3 White: $7
             else if (whiteMatches === 3) { prize = 7; text = '$7'; }
+            // Match 2 White + Powerball: $7
             else if (whiteMatches === 2 && powerMatch) { prize = 7; text = '$7'; }
+            // Match 1 White + Powerball: $4
             else if (whiteMatches === 1 && powerMatch) { prize = 4; text = '$4'; }
+            // Match Powerball only: $4
             else if (powerMatch) { prize = 4; text = '$4'; }
 
             setResult(text);
+
+            // Update statistics
             setStats(prev => {
                 const newStats = {
                     played: prev.played + 1,
                     winnings: prev.winnings + prize,
-                    cost: prev.cost + 2
+                    cost: prev.cost + 2 // Assuming $2 per ticket
                 };
 
-                // Update history every 10 draws or so to keep performance needed? 
-                // Let's do every one for now but limit array size if needed.
-                // Or maybe just every 10 to avoid too much re-render
+                // Update history for the graph
+                // We limit updates to avoid massive arrays, mostly for performance
                 if (newStats.played % 10 === 0 || newStats.played < 100) {
                     setHistory(h => {
                         const newRoi = ((newStats.winnings - newStats.cost) / newStats.cost);
                         const newPoint = { played: newStats.played, roi: newRoi };
-                        // Keep last 200 points for sliding window effect
+                        // Maintain a sliding window of the last 200 data points
                         if (h.length > 200) return [...h.slice(1), newPoint];
                         return [...h, newPoint];
                     });
@@ -88,14 +120,17 @@ export function PowerballSimulation() {
         }
     };
 
+    // Initial setup: Generate quick pick numbers if none exist
     useEffect(() => {
         if (!userWhite.length) quickPick();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Effect to handle auto-play functionality
     useEffect(() => {
         let interval: number;
         if (autoPlay) {
+            // Run draw function repeatedly based on simulationSpeed
             interval = window.setInterval(draw, 1000 / simulationSpeed);
         }
         return () => clearInterval(interval);
@@ -110,7 +145,9 @@ export function PowerballSimulation() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column: Game Interface */}
                 <div>
+                    {/* User Numbers Section */}
                     <div className="mb-6">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-slate-300">Your Numbers</h3>
@@ -130,6 +167,7 @@ export function PowerballSimulation() {
                         </div>
                     </div>
 
+                    {/* Simulation Results Section */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-slate-300">Draw Results</h3>
@@ -142,6 +180,7 @@ export function PowerballSimulation() {
                         <div className="flex gap-2 mb-6">
                             {drawWhite.length > 0 ? (
                                 <>
+                                    {/* Display Draw Numbers with match highlighting */}
                                     {drawWhite.map((n, i) => (
                                         <div key={i} className={`w-10 h-10 rounded-full font-bold flex items-center justify-center border-2 ${userWhite.includes(n)
                                             ? 'bg-green-500 text-white border-green-400'
@@ -150,6 +189,7 @@ export function PowerballSimulation() {
                                             {n}
                                         </div>
                                     ))}
+                                    {/* Display Powerball with match highlighting */}
                                     <div className={`w-10 h-10 rounded-full font-bold flex items-center justify-center border-2 ${userPower === drawPower
                                         ? 'bg-red-600 text-white border-red-500'
                                         : 'bg-slate-700 text-slate-300 border-slate-600'
@@ -158,6 +198,7 @@ export function PowerballSimulation() {
                                     </div>
                                 </>
                             ) : (
+                                // Placeholders before first draw
                                 <div className="flex gap-2">
                                     {[1, 2, 3, 4, 5].map(i => (
                                         <div key={i} className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700 animate-pulse" />
@@ -167,6 +208,7 @@ export function PowerballSimulation() {
                             )}
                         </div>
 
+                        {/* Control Buttons */}
                         <div className="flex flex-col gap-3">
                             <div className="flex gap-3">
                                 <button
@@ -186,6 +228,7 @@ export function PowerballSimulation() {
                                 </button>
                             </div>
 
+                            {/* Speed Slider */}
                             <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded">
                                 <span className="text-xs text-slate-400 w-12">Speed</span>
                                 <input
@@ -202,6 +245,7 @@ export function PowerballSimulation() {
                     </div>
                 </div>
 
+                {/* Right Column: Key Statistics */}
                 <div className="bg-slate-900/50 rounded-lg p-4">
                     <h3 className="text-slate-300 mb-4 opacity-75 uppercase text-sm tracking-wider">Session Statistics</h3>
 
@@ -248,45 +292,44 @@ export function PowerballSimulation() {
                         </button>
 
                         <div className="mt-6 pt-4 border-t border-slate-700/50">
-                            <button
-                                onClick={() => setShowGraph(!showGraph)}
-                                className="mb-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-1 px-3 rounded border border-slate-700 transition-colors flex items-center gap-2"
-                            >
-                                <Activity className="w-3 h-3" />
-                                {showGraph ? 'Hide ROI Graph' : 'View ROI Graph'}
-                            </button>
-
-                            {showGraph && history.length > 1 && (
-                                <div className="h-40 w-full bg-slate-800/50 rounded">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={history}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                            <XAxis
-                                                dataKey="played"
-                                                stroke="#94a3b8"
-                                                tick={{ fontSize: 10 }}
-                                                tickFormatter={(val) => val > 1000 ? `${(val / 1000).toFixed(0)}k` : val}
-                                            />
-                                            <YAxis
-                                                stroke="#94a3b8"
-                                                tick={{ fontSize: 10 }}
-                                                tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
-                                            />
-                                            <Tooltip
-                                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
-                                                labelStyle={{ color: '#94a3b8' }}
-                                                formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'ROI']}
-                                            />
-                                            <Line
-                                                type="monotone"
-                                                dataKey="roi"
-                                                stroke="#f87171"
-                                                dot={false}
-                                                strokeWidth={2}
-                                                isAnimationActive={false}
-                                            />
-                                        </LineChart>
-                                    </ResponsiveContainer>
+                            {/* ROI Graph */}
+                            {history.length > 1 && (
+                                <div className="bg-slate-800/50 rounded p-4 border border-slate-700">
+                                    <h3 className="text-xs text-slate-400 uppercase tracking-widest mb-3">ROI History</h3>
+                                    <div className="h-40 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={history}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                                <XAxis
+                                                    dataKey="played"
+                                                    stroke="#94a3b8"
+                                                    tick={{ fontSize: 10 }}
+                                                    tickFormatter={(val) => val > 1000 ? `${(val / 1000).toFixed(0)}k` : val}
+                                                />
+                                                <YAxis
+                                                    stroke="#94a3b8"
+                                                    tick={{ fontSize: 10 }}
+                                                    tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                                                />
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
+                                                    labelStyle={{ color: '#94a3b8' }}
+                                                    formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'ROI']}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="roi"
+                                                    stroke="#f87171"
+                                                    dot={false}
+                                                    strokeWidth={2}
+                                                    isAnimationActive={false}
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-2 text-center">
+                                        Return on Investment over time
+                                    </div>
                                 </div>
                             )}
                         </div>

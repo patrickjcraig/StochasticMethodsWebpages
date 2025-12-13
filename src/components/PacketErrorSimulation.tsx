@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Package, RefreshCw, AlertTriangle, CheckCircle, XCircle, Play, Pause, RotateCcw, Table, ScanLine, Activity } from 'lucide-react';
+import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Play, Pause, RotateCcw, ScanLine } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend } from "recharts";
 
 export function PacketErrorSimulation() {
@@ -13,7 +13,6 @@ export function PacketErrorSimulation() {
 
     const [isAutoPlaying, setIsAutoPlaying] = useState(false);
     const [simulationSpeed, setSimulationSpeed] = useState(10);
-    const [showGraph, setShowGraph] = useState(false);
     const [stats, setStats] = useState({
         total: 0,
         caught: 0,
@@ -130,33 +129,50 @@ export function PacketErrorSimulation() {
         setDetected(retransmit);
     };
 
-    // Autoplay Step
+    // Autoplay Step: The core logic of the Monte Carlo simulation
     const runSimulationStep = useCallback(() => {
-        // 1. Generate local packets
+        // 1. Generate local packets (simulating a transmission batch)
+        // Some packets are randomly marked as 'corrupted' based on errorCount
         const newPackets = createPackets(errorCount);
-        // 2. Test them
+
+        // 2. Test them (simulating random sampling quality control)
+        // We pick 'testCount' random indices to check
         const tested = pickTestIndices(testCount);
 
-        // 3. Logic
+        // 3. Logic: Check the Sample
         let errorFoundCount = 0;
         tested.forEach(idx => {
             if (newPackets[idx]) errorFoundCount++;
         });
+
+        // If the number of errors found in the sample exceeds our tolerance (k),
+        // we reject the batch and request retransmission.
         const retransmit = errorFoundCount > tolerance;
 
-        // 4. Ground Truth
+        // 4. Ground Truth Confirmation
+        // We know the ACTUAL state of all 100 packets (God Mode).
+        // A "Bad Batch" is one where total errors > tolerance, which SHOULD have been caught.
         const totalErrors = newPackets.filter(p => p).length;
         const isBadBatch = totalErrors > tolerance;
 
-        // 5. Update Stats
+        // 5. Update Aggregate Statistics
         setStats(prev => {
             const s = { ...prev };
-            s.total++;
+            s.total++; // Total batches transmitted
+
             if (retransmit) {
+                // True Positive (we caught it) OR False Positive (wasteful retransmit, but still "safe")
+                // For simplified metrics, we count this as "Caught/Safety Triggered"
                 s.caught++;
             } else {
-                if (isBadBatch) s.missed++;
-                else s.valid++;
+                if (isBadBatch) {
+                    // False Negative: Use didn't retransmit, but the batch WAS bad. 
+                    // This is a "Missed" detection (Safety Failure).
+                    s.missed++;
+                } else {
+                    // True Negative: Batch was good, and we let it pass.
+                    s.valid++;
+                }
             }
             const newCaught = s.caught + (retransmit ? 1 : 0);
             const newMissed = s.missed + (!retransmit && isBadBatch ? 1 : 0);
@@ -471,67 +487,61 @@ export function PacketErrorSimulation() {
                         )}
 
                         {/* Convergence Plot */}
-                        <div className="mt-4 flex flex-col gap-2">
-                            <button
-                                onClick={() => setShowGraph(!showGraph)}
-                                className="self-end bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-1 px-3 rounded border border-slate-700 transition-colors flex items-center gap-2"
-                            >
-                                <Activity className="w-3 h-3" />
-                                {showGraph ? 'Hide Convergence Graph' : 'View Convergence Graph'}
-                            </button>
-
-                            {showGraph && convergenceData.length > 1 && (
-                                <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800">
-                                    <h3 className="text-xs text-slate-400 uppercase tracking-widest mb-4">Safety Convergence</h3>
-                                    <div className="h-48 w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={convergenceData}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                                                <XAxis
-                                                    dataKey="runs"
-                                                    stroke="#64748b"
-                                                    tick={{ fontSize: 10 }}
+                        {convergenceData.length > 0 && (
+                            <div className="bg-slate-900/50 rounded-lg p-4 mt-6 border border-slate-800">
+                                <h3 className="text-sm text-slate-400 mb-3 uppercase tracking-widest">Safety Convergence</h3>
+                                <div className="h-64 w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={convergenceData}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                            <XAxis
+                                                dataKey="runs"
+                                                stroke="#94a3b8"
+                                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                                tickFormatter={(val) => val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}
+                                            />
+                                            <YAxis
+                                                stroke="#94a3b8"
+                                                tick={{ fill: '#94a3b8', fontSize: 12 }}
+                                                tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                                                domain={[0, 1]}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f1f5f9' }}
+                                                labelStyle={{ color: '#94a3b8' }}
+                                                formatter={(value: number) => [`${(value * 100).toFixed(2)}%`, 'Safety Rate']}
+                                            />
+                                            <Legend verticalAlign="top" height={36} />
+                                            {theoreticalSafety > 0 && (
+                                                <ReferenceLine
+                                                    y={theoreticalSafety}
+                                                    stroke="#f472b6"
+                                                    strokeDasharray="5 5"
+                                                    label={{
+                                                        value: `Theoretical: ${(theoreticalSafety * 100).toFixed(1)}%`,
+                                                        fill: '#f472b6',
+                                                        position: 'insideTopRight',
+                                                        fontSize: 12
+                                                    }}
                                                 />
-                                                <YAxis
-                                                    domain={[0, 1]}
-                                                    stroke="#64748b"
-                                                    tick={{ fontSize: 10 }}
-                                                    tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155' }}
-                                                    labelStyle={{ color: '#94a3b8' }}
-                                                    formatter={(value: number) => [`${(value * 100).toFixed(1)}%`, 'Safety']}
-                                                />
-                                                <Legend verticalAlign="top" height={36} />
-                                                <Line
-                                                    name="Experimental"
-                                                    type="monotone"
-                                                    dataKey="safety"
-                                                    stroke="#22d3ee"
-                                                    strokeWidth={2}
-                                                    dot={false}
-                                                    isAnimationActive={false}
-                                                />
-                                                {theoreticalSafety > 0 && (
-                                                    <ReferenceLine
-                                                        y={theoreticalSafety}
-                                                        stroke="#f472b6"
-                                                        strokeDasharray="3 3"
-                                                        label={{
-                                                            value: `Theoretical: ${(theoreticalSafety * 100).toFixed(1)}%`,
-                                                            fill: '#f472b6',
-                                                            position: 'insideTopRight',
-                                                            fontSize: 12
-                                                        }}
-                                                    />
-                                                )}
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                                            )}
+                                            <Line
+                                                name="Experimental"
+                                                type="monotone"
+                                                dataKey="safety"
+                                                stroke="#22d3ee"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                isAnimationActive={false}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
                                 </div>
-                            )}
-                        </div>
+                                <div className="text-xs text-slate-500 mt-2">
+                                    Graph shows the experimental safety verification rate over time.
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -216,6 +216,9 @@ export function ProbabilitySimulation({
             </h2>
 
             <div className="space-y-4">
+                {/* Convergence Graph - Displays while running and after */}
+
+
                 {/* Simulation Control Panel */}
                 <div className="bg-slate-900/50 rounded p-4">
                     <label className="block text-sm text-slate-400 mb-2">
@@ -299,6 +302,9 @@ export function ProbabilitySimulation({
                         <RotateCcw className="w-5 h-5" />
                     </button>
                 </div>
+
+                {/* Convergence Graph - Displays while running and after */}
+
 
                 {/* Convergence Graph - Displays while running and after */}
                 {convergenceData.length > 0 && (

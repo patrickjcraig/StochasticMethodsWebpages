@@ -1,42 +1,50 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Dices, RefreshCw, Play, Pause, RotateCcw, Activity } from 'lucide-react';
+import { Dices, RefreshCw, Play, Pause, RotateCcw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export function DiceRollSimulation() {
+    // State for number of dice rolls per trial (M)
     const [numRolls, setNumRolls] = useState(13); // Default example M value
-    const [target, setTarget] = useState<'gt4' | 'eq6'>('gt4');
-    const [rolls, setRolls] = useState<number[]>([]);
-    const [success, setSuccess] = useState(false);
-    const [hasRun, setHasRun] = useState(false);
-    const [showGraph, setShowGraph] = useState(false);
+    // State for the success condition: selected faces (default to > 4, i.e., 5 and 6)
+    const [selectedFaces, setSelectedFaces] = useState<number[]>([5, 6]);
 
-    // Autoplay
+    // State for current batch of rolled dice values
+    const [rolls, setRolls] = useState<number[]>([]);
+    // State for whether the current trial was successful
+    const [success, setSuccess] = useState(false);
+    // State to track if at least one simulation has run
+    const [hasRun, setHasRun] = useState(false);
+
+    // Autoplay configuration state
     const [isAutoPlaying, setIsAutoPlaying] = useState(false);
     const [simulationSpeed, setSimulationSpeed] = useState(10);
+
+    // Aggregate statistics
     const [stats, setStats] = useState({ attempts: 0, successes: 0 });
+    // History for graph plotting: keeps track of simulated vs theoretical probability over time
     const [history, setHistory] = useState<Array<{ count: number; simulated: number; theoretical: number }>>([]);
 
     // Use ref for stats to avoid stale closures in setInterval without resetting it constantly
+    // This allows the interval callback to access the most recent stats without needing to be re-created on every render
     const statsRef = React.useRef(stats);
     useEffect(() => {
         statsRef.current = stats;
     }, [stats]);
 
-    // Reset when parameters change
+    // Reset statistics when simulation parameters (rules) change
     useEffect(() => {
         reset();
-    }, [numRolls, target]);
+    }, [numRolls, selectedFaces]);
 
+    // Core simulation function: runs one trial (one set of M rolls)
     const runSimulation = () => {
+        // Generate M random die rolls (1-6)
         const newRolls = Array.from({ length: numRolls }, () => Math.floor(Math.random() * 6) + 1);
         setRolls(newRolls);
 
-        // Check success
-        const isSuccess = newRolls.some(r => {
-            if (target === 'gt4') return r > 4; // 5 or 6
-            if (target === 'eq6') return r === 6;
-            return false;
-        });
+        // Check if the trial is a success based on the target criteria
+        // Success = at least one die meets the condition (Standard De Méré style problem)
+        const isSuccess = newRolls.some(r => selectedFaces.includes(r));
 
         setSuccess(isSuccess);
         setHasRun(true);
@@ -47,14 +55,23 @@ export function DiceRollSimulation() {
         const newSuccesses = currentStats.successes + (isSuccess ? 1 : 0);
         const newStats = { attempts: newAttempts, successes: newSuccesses };
 
-        // Update Ref immediately so next tick sees it
+        // Update Ref immediately so next potentially rapid tick sees it
         statsRef.current = newStats;
         setStats(newStats);
 
+        // Calculate experimental probability
         const simulatedProb = newSuccesses / newAttempts;
-        const pFail = target === 'gt4' ? 4 / 6 : 5 / 6;
+
+        // Calculate theoretical probability
+        // Based on the Chevalier de Méré's problem logic:
+        // P(At least one success) = 1 - P(No successes in any of the dice)
+        // This is much easier than summing P(1 success) + P(2 successes) + ...
+        // P(Single Die Fails) = (Total Faces - Target Faces) / Total Faces
+        const pSuccessOne = selectedFaces.length / 6;
+        const pFail = 1 - pSuccessOne;
         const theoreticalProb = 1 - Math.pow(pFail, numRolls);
 
+        // Append to history for the graph
         setHistory(prevHist => [
             ...prevHist,
             {
@@ -65,6 +82,7 @@ export function DiceRollSimulation() {
         ]);
     };
 
+    // Effect to handle auto-play interval
     useEffect(() => {
         let interval: number;
         if (isAutoPlaying) {
@@ -72,8 +90,9 @@ export function DiceRollSimulation() {
         }
         return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isAutoPlaying, simulationSpeed, numRolls, target]); // Removed stats dependency to prevent interval reset
+    }, [isAutoPlaying, simulationSpeed, numRolls, selectedFaces]); // Removed stats dependency to prevent interval reset
 
+    // Reset all state to initial values
     const reset = () => {
         setStats({ attempts: 0, successes: 0 });
         setHistory([]);
@@ -83,15 +102,27 @@ export function DiceRollSimulation() {
         statsRef.current = { attempts: 0, successes: 0 };
     };
 
+    // Helper to convert number to dice face character
     const getDieFace = (val: number) => {
         return ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][val - 1];
     };
 
-    // Calculate theoretical for display
+    // Calculate theoretical probability for display in the UI (memoized for performance)
     const currentTheoretical = useMemo(() => {
-        const pFail = target === 'gt4' ? 4 / 6 : 5 / 6;
+        const pSuccessOne = selectedFaces.length / 6;
+        const pFail = 1 - pSuccessOne;
         return 1 - Math.pow(pFail, numRolls);
-    }, [target, numRolls]);
+    }, [selectedFaces, numRolls]);
+
+    const toggleFace = (face: number) => {
+        setSelectedFaces(prev => {
+            if (prev.includes(face)) {
+                return prev.filter(f => f !== face);
+            } else {
+                return [...prev, face].sort((a, b) => a - b);
+            }
+        });
+    };
 
     return (
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 mt-8">
@@ -101,6 +132,7 @@ export function DiceRollSimulation() {
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+                {/* Inputs: Number of Rolls */}
                 <div>
                     <label className="block text-slate-300 mb-2">Number of Rolls (M)</label>
                     <div className="flex items-center gap-4">
@@ -117,25 +149,23 @@ export function DiceRollSimulation() {
                     </div>
                 </div>
 
+                {/* Inputs: Success Criterion */}
                 <div>
-                    <label className="block text-slate-300 mb-2">Success Criterion</label>
+                    <label className="block text-slate-300 mb-2">Success Faces (Select Multiple)</label>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setTarget('gt4')}
-                            disabled={isAutoPlaying}
-                            className={`px-3 py-1 rounded text-sm transition-colors disabled:opacity-50 ${target === 'gt4' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'
-                                }`}
-                        >
-                            &gt; 4 (5,6)
-                        </button>
-                        <button
-                            onClick={() => setTarget('eq6')}
-                            disabled={isAutoPlaying}
-                            className={`px-3 py-1 rounded text-sm transition-colors disabled:opacity-50 ${target === 'eq6' ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-300'
-                                }`}
-                        >
-                            = 6
-                        </button>
+                        {[1, 2, 3, 4, 5, 6].map(face => (
+                            <button
+                                key={face}
+                                onClick={() => toggleFace(face)}
+                                disabled={isAutoPlaying}
+                                className={`w-10 h-10 rounded text-lg font-bold transition-colors disabled:opacity-50 flex items-center justify-center ${selectedFaces.includes(face)
+                                    ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                    : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                                    }`}
+                            >
+                                {getDieFace(face)}
+                            </button>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -155,6 +185,7 @@ export function DiceRollSimulation() {
                     <span className="text-xs text-slate-400 w-8 text-right">{simulationSpeed}x</span>
                 </div>
 
+                {/* Simulation Control Buttons */}
                 <div className="flex gap-4">
                     <button
                         onClick={runSimulation}
@@ -188,13 +219,14 @@ export function DiceRollSimulation() {
                         <div className="text-sm text-slate-400 mb-2">Current Roll Outcomes</div>
                         <div className="flex flex-wrap gap-2 justify-center mb-4">
                             {rolls.map((val, i) => {
-                                const isHit = target === 'gt4' ? val > 4 : val === 6;
+                                const isHit = selectedFaces.includes(val);
                                 return (
                                     <div
                                         key={i}
                                         className={`w-10 h-10 flex items-center justify-center text-3xl rounded ${isHit ? 'bg-green-500/20 text-green-400 border border-green-500/50' : 'bg-slate-900/50 text-slate-500'
                                             }`}
                                     >
+                                        {/* Display unicode die face */}
                                         {getDieFace(val)}
                                     </div>
                                 );
@@ -229,54 +261,55 @@ export function DiceRollSimulation() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => setShowGraph(!showGraph)}
-                            className="mb-4 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs py-2 px-4 rounded border border-slate-700 transition-colors flex items-center gap-2"
-                        >
-                            <Activity className="w-3 h-3" />
-                            {showGraph ? 'Hide Convergence Graph' : 'View Convergence Graph'}
-                        </button>
-
-                        {showGraph && (
-                            <div className="h-[300px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={history}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                        <XAxis
-                                            dataKey="count"
-                                            stroke="#94a3b8"
-                                            label={{ value: 'Trials', position: 'insideBottom', offset: -5, fill: '#94a3b8' }}
-                                        />
-                                        <YAxis
-                                            domain={[0, 1]}
-                                            stroke="#94a3b8"
-                                            tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }}
-                                            formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'Probability']}
-                                            labelFormatter={(label) => `Trial: ${label}`}
-                                        />
-                                        <Legend />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="simulated"
-                                            stroke="#3b82f6"
-                                            dot={false}
-                                            strokeWidth={2}
-                                            name="Simulated"
-                                            isAnimationActive={false}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="theoretical"
-                                            stroke="#4ade80"
-                                            strokeDasharray="5 5"
-                                            dot={false}
-                                            name="Theoretical"
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
+                        {/* Convergence Graph - Displays while running and after */}
+                        {history.length > 0 && (
+                            <div className="bg-slate-900/50 rounded-lg p-4 mb-4">
+                                <h3 className="text-sm text-slate-400 mb-3">Probability Convergence</h3>
+                                <div className="h-[250px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={history}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                            <XAxis
+                                                dataKey="count"
+                                                stroke="#94a3b8"
+                                                tickFormatter={(val) => val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}
+                                                fontSize={12}
+                                            />
+                                            <YAxis
+                                                domain={[0, 1]}
+                                                stroke="#94a3b8"
+                                                tickFormatter={(val) => `${(val * 100).toFixed(0)}%`}
+                                                fontSize={12}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }}
+                                                formatter={(val: number) => [(val * 100).toFixed(2) + '%', 'Probability']}
+                                                labelFormatter={(label) => `Trial: ${label}`}
+                                            />
+                                            <Legend />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="simulated"
+                                                stroke="#3b82f6"
+                                                dot={false}
+                                                strokeWidth={2}
+                                                name="Simulated"
+                                                isAnimationActive={false}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="theoretical"
+                                                stroke="#4ade80"
+                                                strokeDasharray="5 5"
+                                                dot={false}
+                                                name="Theoretical"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="text-xs text-slate-500 mt-2">
+                                    Blue line shows experimental probability converging to green theoretical line.
+                                </div>
                             </div>
                         )}
                     </div>
@@ -285,4 +318,3 @@ export function DiceRollSimulation() {
         </div>
     );
 }
-
