@@ -1,3 +1,6 @@
+## Website Visit
+Visit the website here: [Link](https://patrickjcraig.github.io/StochasticMethodsWebpages/)
+
 ## Running the code
 
 Run `npm i` to install the dependencies.
